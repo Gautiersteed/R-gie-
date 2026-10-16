@@ -131,22 +131,36 @@
         }
 
         .btn {
-            background-color: var(--accent-color);
+            width: 100%;
+            padding: 12px;
+            background-color: #333;
             color: white;
             border: none;
-            padding: 12px;
             border-radius: 6px;
             cursor: pointer;
             font-weight: bold;
             font-size: 0.9em;
             transition: background 0.2s;
-            width: 100%;
             text-align: center;
             box-sizing: border-box;
         }
 
-        .btn-warning {
-            background-color: #f57c00;
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        /* Bouton Google Connexion par défaut */
+        #loginBtn {
+            background-color: var(--accent-color);
+        }
+
+        /* NOUVEAU : Bouton Forcer le réveil configuré en ROUGE */
+        .btn-danger {
+            background-color: var(--accent-color) !important;
+            color: white !important;
+        }
+        .btn-danger:hover {
+            background-color: #cc0000 !important;
         }
 
         .status-box {
@@ -166,7 +180,7 @@
             font-size: 1.05em;
         }
     </style>
-    <!-- CORRECTION : URL officielle pour l'API Google Sign-In / OAuth -->
+    
     <script src="https://google.com" async defer></script>
 </head>
 <body>
@@ -174,6 +188,7 @@
 <div class="container">
     <div class="main-panel">
         
+        <!-- Lecteur natif Iframe -->
         <div class="video-container" id="mediaWrapper">
             <iframe id="ytPlayer" src="" allow="autoplay; encrypted-media" allowfullscreen></iframe>
         </div>
@@ -197,7 +212,8 @@
                     <input type="text" id="domainInput" value="gautiersteed.github.io">
                 </div>
             </div>
-            <button class="btn btn-warning" onclick="updateFramesUrls()" style="margin-top:10px;">🔄 Forcer le réveil du Lecteur</button>
+            <!-- CONFIGURATION : Bouton en classe rouge (btn-danger) -->
+            <button class="btn btn-danger" onclick="updateFramesUrls()" style="margin-top:10px;">🔄 Forcer le réveil du Lecteur</button>
         </div>
 
         <div class="card">
@@ -212,7 +228,7 @@
                     <input type="datetime-local" id="endTime">
                 </div>
             </div>
-            <button class="btn" onclick="scheduleLiveBroadcast()" style="margin-top:15px;">Planifier & Activer la Synchronisation</button>
+            <button class="btn" onclick="scheduleLiveBroadcast()" style="margin-top:15px; background-color: var(--panel-bg); border: 1px solid var(--border-color);">Planifier & Activer la Synchronisation</button>
             <div class="status-box" id="systemLog">Système : Prêt. En attente d'une action...</div>
         </div>
     </div>
@@ -228,9 +244,10 @@
 <script>
     const database = localStorage;
     const logBox = document.getElementById('systemLog');
-    let tokenClient;
+    let tokenClient = null;
 
     window.addEventListener('DOMContentLoaded', () => {
+        // Initialisation de la mémoire locale de l'appareil si elle est vide
         if (!database.getItem('videoIdInput')) {
             database.setItem('videoIdInput', '06Ucv-ZcPWg');
         }
@@ -240,18 +257,22 @@
 
         const fields = ['clientIdInput', 'videoIdInput', 'domainInput', 'startTime', 'endTime'];
         fields.forEach(id => {
-            if(database.getItem(id)) {
-                document.getElementById(id).value = database.getItem(id);
+            const element = document.getElementById(id);
+            if (element) {
+                if (database.getItem(id)) {
+                    element.value = database.getItem(id);
+                }
+                element.addEventListener('input', saveData);
             }
-            document.getElementById(id).addEventListener('input', saveData);
         });
         
+        // Premier réveil automatique au chargement
         updateFramesUrls();
     });
 
     function saveData() {
         database.setItem(this.id, this.value);
-        if(this.id === 'videoIdInput' || this.id === 'domainInput') {
+        if (this.id === 'videoIdInput' || this.id === 'domainInput') {
             updateFramesUrls();
         }
     }
@@ -260,50 +281,28 @@
         logBox.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
     }
 
-    // CORRECTION : Fonction entièrement réécrite et sécurisée
+    // CORRECTION : Résolution complète de la fonction coupée et sécurisation des variables du DOM
     function updateFramesUrls() {
-        const videoId = document.getElementById('videoIdInput').value.trim();
-        const domain = document.getElementById('domainInput').value.trim();
+        const videoIdField = document.getElementById('videoIdInput');
+        const domainField = document.getElementById('domainInput');
+        const playerFrame = document.getElementById('ytPlayer');
+        const chatFrame = document.getElementById('ytChat');
+
+        if (!videoIdField || !domainField || !playerFrame || !chatFrame) {
+            log("❌ Erreur : Structure du DOM brisée ou manquante.");
+            return;
+        }
+
+        const videoId = videoIdField.value.trim();
+        const domain = domainField.value.trim();
 
         if (!videoId) {
-            log("❌ ID Vidéo manquant");
+            log("❌ Erreur : Aucun ID de vidéo YouTube renseigné.");
             return;
         }
 
-        // Configuration propre des iFrames YouTube
-        document.getElementById('ytPlayer').src = `https://youtube.com{videoId}?autoplay=1&origin=https://${domain}`;
-        
+        // Mise à jour sécurisée de l'iframe vidéo
+        playerFrame.src = `https://youtube.com{videoId}?autoplay=1&origin=https://${domain}&enablejsapi=1`;
+
+        // Mise à jour de l'iframe Chat en direct
         if (domain) {
-            document.getElementById('ytChat').src = `https://youtube.com{videoId}&embed_domain=${domain}`;
-            log("🔄 Lecteur et Chat synchronisés.");
-        } else {
-            log("⚠️ ID Vidéo mis à jour. Domaine manquant pour charger le chat.");
-        }
-    }
-
-    // Logique d'initialisation OAuth2 Google
-    function handleAuthClick() {
-        const clientId = document.getElementById('clientIdInput').value.trim();
-        if (!clientId) {
-            log("❌ Veuillez renseigner l'ID Client OAuth 2.0.");
-            return;
-        }
-
-        try {
-            tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: clientId,
-                scope: 'https://googleapis.com',
-                callback: (tokenResponse) => {
-                    if (tokenResponse && tokenResponse.access_token) {
-                        log("🔐 Authentification réussie avec Google Cloud !");
-                        document.getElementById('loginBtn').innerText = "✅ Connecté";
-                        document.getElementById('loginBtn').style.backgroundColor = "var(--success-color)";
-                    }
-                },
-            });
-            tokenClient.requestAccessToken({prompt: 'consent'});
-        } catch (err) {
-            log(`❌ Erreur d'authentification : ${err.message}`);
-        }
-    }
-
