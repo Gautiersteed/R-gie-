@@ -1,108 +1,314 @@
-<script>
-    const database = localStorage;
-    const logBox = document.getElementById('systemLog');
-    let scheduleTimer = null;
-
-    window.addEventListener('DOMContentLoaded', () => {
-        // Initialisation des valeurs par défaut si le localStorage est vide
-        if (!database.getItem('videoIdInput')) database.setItem('videoIdInput', '06Ucv-ZcPWg');
-        if (!database.getItem('domainInput')) database.setItem('domainInput', 'gautiersteed.github.io');
-
-        const fields = ['clientIdInput', 'videoIdInput', 'domainInput', 'startTime', 'endTime'];
-        fields.forEach(id => {
-            const element = document.getElementById(id);
-            if (element) {
-                if (database.getItem(id)) {
-                    element.value = database.getItem(id);
-                }
-                element.addEventListener('input', saveData);
-            }
-        });
-        
-        updateFramesUrls();
-    });
-
-    function saveData() {
-        database.setItem(this.id, this.value);
-        if (this.id === 'videoIdInput' || this.id === 'domainInput') {
-            updateFramesUrls();
-        }
-    }
-
-    function log(message) {
-        logBox.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
-    }
-
-    // Génère les URL natives YouTube optimisées pour mobile avec boucle automatique
-    function updateFramesUrls() {
-        const videoId = document.getElementById('videoIdInput').value.trim();
-        const domain = document.getElementById('domainInput').value.trim();
-        
-        if (!videoId) {
-            log("⚠️ ID Vidéo manquant.");
-            return;
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Régie Mobile YouTube Live</title>
+    <style>
+        /* Charte Graphique Mode Sombre - Inspirée de YouTube Studio */
+        :root {
+            --bg-main: #0f0f0f;
+            --bg-card: #212121;
+            --bg-input: #121212;
+            --text-main: #f1f1f1;
+            --text-sub: #aaa;
+            --accent-red: #ff0000;
+            --accent-orange: #ff5722;
+            --accent-blue: #3ea6ff;
+            --border-color: #3d3d3d;
         }
 
-        const playerIframe = document.getElementById('ytPlayer');
-        const chatIframe = document.getElementById('ytChat');
-
-        // Paramètres : boucle activée (loop=1&playlist=ID), muet par défaut pour l'autoplay mobile (mute=1)
-        const playerUrl = `https://youtube.com{videoId}?autoplay=1&loop=1&playlist=${videoId}&mute=1&origin=https://${domain}`;
-        const chatUrl = `https://youtube.com{videoId}&embed_domain=${domain}`;
-
-        if (playerIframe.src !== playerUrl) playerIframe.src = playerUrl;
-        if (chatIframe.src !== chatUrl) chatIframe.src = chatUrl;
-        
-        log("🔄 Lecteur et Chat synchronisés.");
-    }
-
-    // Orchestration horaire simplifiée (Native)
-    function scheduleLiveBroadcast() {
-        if (scheduleTimer) clearInterval(scheduleTimer);
-
-        const startTimeVal = document.getElementById('startTime').value;
-        const endTimeVal = document.getElementById('endTime').value;
-
-        if (!startTimeVal || !endTimeVal) {
-            log("⚠️ Veuillez configurer les heures de début et de fin.");
-            return;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
-        const startMs = new Date(startTimeVal).getTime();
-        const endMs = new Date(endTimeVal).getTime();
-
-        log("⏳ Surveillance horaire activée...");
-
-        scheduleTimer = setInterval(() => {
-            const now = Date.now();
-
-            if (now >= startMs && now < endMs) {
-                if (document.getElementById('mediaWrapper').style.display === 'none') {
-                    document.getElementById('mediaWrapper').style.display = 'block';
-                    updateFramesUrls();
-                    log("🟢 Diffusion en cours (Tranche horaire active).");
-                }
-            } else {
-                if (document.getElementById('mediaWrapper').style.display !== 'none') {
-                    document.getElementById('mediaWrapper').style.display = 'none';
-                    document.getElementById('ytPlayer').src = "";
-                    document.getElementById('ytChat').src = "";
-                    log("🔴 Hors plage horaire. Lecteur mis en veille.");
-                }
-            }
-        }, 5000); // Vérification légère toutes les 5 secondes
-    }
-
-    // Emplacement pour votre logique de connexion Google API
-    function handleAuthClick() {
-        const clientId = document.getElementById('clientIdInput').value.trim();
-        if (!clientId) {
-            log("⚠️ Configurez d'abord votre ID Client OAuth 2.0.");
-            return;
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            padding: 12px;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
         }
-        log("🔐 Initialisation de l'authentification Google Cloud...");
-        // Ajoutez vos scripts gapi / tokenClient natifs ici si nécessaire
-    }
-</script>
-</body>
-</html>
+
+        header {
+            text-align: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        header h1 {
+            font-size: 1.2rem;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        header h1::before {
+            content: '';
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background-color: var(--accent-red);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.4; }
+            50% { opacity: 1; }
+            100% { opacity: 0.4; }
+        }
+
+        .section-card {
+            background-color: var(--bg-card);
+            border-radius: 8px;
+            padding: 14px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border-color);
+        }
+
+        .section-title {
+            font-size: 0.9rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            color: var(--text-sub);
+        }
+
+        /* Lecteurs et Frames */
+        .video-container {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%; /* Ratio 16:9 */
+            height: 0;
+            background-color: #000;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .video-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+
+        .chat-container {
+            width: 100%;
+            height: 250px;
+            background-color: var(--bg-input);
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .chat-container iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+
+        .chat-warning {
+            font-size: 0.75rem;
+            color: var(--accent-orange);
+            background-color: rgba(255, 87, 34, 0.1);
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 6px;
+            border-left: 3px solid var(--accent-orange);
+        }
+
+        /* Formulaires et Boutons */
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-sub);
+            margin-bottom: 4px;
+        }
+
+        input[type="text"], input[type="datetime-local"] {
+            width: 100%;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus, input[type="datetime-local"]:focus {
+            border-color: var(--accent-blue);
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            background-color: var(--accent-blue);
+            color: #000;
+            font-weight: bold;
+            border: none;
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            text-align: center;
+            transition: opacity 0.2s;
+        }
+
+        .btn:active {
+            opacity: 0.8;
+        }
+
+        .btn-orange {
+            background-color: var(--accent-orange);
+            color: var(--text-main);
+            margin-top: 8px;
+        }
+
+        /* Logs de la console */
+        .console-logs {
+            background-color: #000;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.75rem;
+            padding: 10px;
+            border-radius: 4px;
+            height: 120px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            color: #4af626;
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+            line-height: 1.2;
+        }
+
+        .log-time {
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>STUDIO RÉGIE MOBILE</h1>
+    </header>
+
+    <!-- 1. & 6. LECTEUR VIDÉO ET BOUTON DE RÉVEIL -->
+    <div class="section-card">
+        <div class="section-title">Moniteur Principal (Loop Actif)</div>
+        <div class="video-container">
+            <iframe id="mainPlayer" src="" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        </div>
+        <button id="btnWake" class="btn btn-orange">Forcer le réveil du Lecteur</button>
+    </div>
+
+    <!-- 3. CONFIGURATION OAUTH 2.0 & SATELLITES -->
+    <div class="section-card">
+        <div class="section-title">Console Google Cloud & Identification</div>
+        <div class="form-group">
+            <label for="oauthClientId">ID Client OAuth 2.0</label>
+            <input type="text" id="oauthClientId" placeholder="://googleusercontent.com">
+        </div>
+        <div class="form-group">
+            <label for="videoId">ID de la Vidéo YouTube</label>
+            <input type="text" id="videoId" value="06Ucv-ZcPWg">
+        </div>
+        <div class="form-group">
+            <label for="originDomain">Domaine d'Hébergement</label>
+            <input type="text" id="originDomain" value="gautiersteed.github.io">
+        </div>
+        <div class="form-group" style="margin-top: 14px;">
+            <button id="btnConnect" class="btn">Connexion API Google</button>
+        </div>
+    </div>
+
+    <!-- 4. CHAT EN DIRECT -->
+    <div class="section-card">
+        <div class="section-title">Flux Chat en Direct</div>
+        <div class="chat-container">
+            <iframe id="liveChatFrame" src=""></iframe>
+        </div>
+        <div class="chat-warning">
+            ⚠️ Le chat restera structurellement bloqué (refus de connexion ou page blanche) par YouTube tant que l'ID associé ne correspond pas à un flux Live actuellement "En Direct" et actif.
+        </div>
+    </div>
+
+    <!-- 5. ORCHESTRATION TEMPORELLE API -->
+    <div class="section-card">
+        <div class="section-title">Orchestration API (Planification)</div>
+        <div class="form-group">
+            <label for="startTime">Date & Heure de Début</label>
+            <input type="datetime-local" id="startTime">
+        </div>
+        <div class="form-group">
+            <label for="endTime">Date & Heure de Fin</label>
+            <input type="datetime-local" id="endTime">
+        </div>
+        <button id="btnSchedule" class="btn" style="background-color: transparent; border: 1px solid var(--accent-blue); color: var(--accent-blue); margin-top: 8px;">
+            Simuler la planification d'API
+        </button>
+    </div>
+
+    <!-- LOGS SYSTEME -->
+    <div class="section-card">
+        <div class="section-title">Logs Système</div>
+        <div id="consoleLogs" class="console-logs"></div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const mainPlayer = document.getElementById('mainPlayer');
+        const liveChatFrame = document.getElementById('liveChatFrame');
+        const btnWake = document.getElementById('btnWake');
+        const btnConnect = document.getElementById('btnConnect');
+        const btnSchedule = document.getElementById('btnSchedule');
+        const consoleLogs = document.getElementById('consoleLogs');
+
+        const inputs = [
+            { id: 'oauthClientId', default: '' },
+            { id: 'videoId', default: '06Ucv-ZcPWg' },
+            { id: 'originDomain', default: 'gautiersteed.github.io' },
+            { id: 'startTime', default: '' },
+            { id: 'endTime', default: '' }
+        ];
+
+        // Système de Logs
+        function log(message) {
+            const now = new Date();
+            const timeStr = now.toTimeString().split(' ')[0];
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${timeStr}]</span> ${message}`;
+            consoleLogs.appendChild(entry);
+            consoleLogs.scrollTop = consoleLogs.scrollHeight;
+        }
+
+        // 2. PERSISTANCE WEB TO APK (LocalStorage)
+        function initStorage() {
+            inputs.forEach(inputObj => {
+                const element = document.getElementById(inputObj.id);
+                const savedValue = localStorage.getItem(inputObj.id);
+                
+                if (savedValue !== null) {
+                    element.value = savedValue;
