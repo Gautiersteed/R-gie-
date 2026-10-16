@@ -1,308 +1,311 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Régie Mobile Autonome</title>
-    <style>
-        :root {
-            --bg-color: #0f0f0f;
-            --panel-bg: #1f1f1f;
-            --accent-color: #ff0000;
-            --text-color: #f1f1f1;
-            --text-muted: #aaa;
-            --border-color: #383838;
-            --success-color: #2ba640;
-        }
-
-        body {
-            font-family: 'Roboto', sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 10px;
-            box-sizing: border-box;
-            overflow-x: hidden;
-        }
-
-        .container {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            width: 100%;
-            max-width: 100%;
-            box-sizing: border-box;
-        }
-
-        .main-panel {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            width: 100%;
-        }
-
-        .video-container {
-            position: relative;
-            padding-bottom: 56.25%;
-            height: 0;
-            background: #000;
-            border-radius: 12px;
-            overflow: hidden;
-            border: 1px solid var(--border-color);
-            width: 100%;
-        }
-
-        .video-container iframe {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border: 0;
-        }
-
-        .chat-panel {
-            background-color: var(--panel-bg);
-            border-radius: 12px;
-            border: 1px solid var(--border-color);
-            height: 350px;
-            display: flex;
-            flex-direction: column;
-            width: 100%;
-            box-sizing: border-box;
-        }
-
-        .chat-panel iframe {
-            width: 100%;
-            height: 100%;
-            border: 0;
-            border-radius: 0 0 12px 12px;
-        }
-
-        .panel-header {
-            padding: 12px;
-            font-weight: bold;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.9em;
-        }
-
-        .card {
-            background-color: var(--panel-bg);
-            border-radius: 12px;
-            padding: 15px;
-            border: 1px solid var(--border-color);
-            box-sizing: border-box;
-            width: 100%;
-        }
-
-        .grid-inputs {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 10px;
-            width: 100%;
-        }
-
-        @media (min-width: 600px) {
-            .grid-inputs {
-                grid-template-columns: 1fr 1fr;
-            }
-        }
-
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-size: 0.85em;
-            color: var(--text-muted);
-        }
-
-        input {
-            width: 100%;
-            padding: 10px;
-            background-color: var(--bg-color);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            color: var(--text-color);
-            box-sizing: border-box;
-            margin-bottom: 5px;
-            font-size: 0.9em;
-        }
-
-        .btn {
-            width: 100%;
-            padding: 12px;
-            background-color: #333;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 0.9em;
-            transition: background 0.2s;
-            text-align: center;
-            box-sizing: border-box;
-        }
-
-        .btn:hover {
-            opacity: 0.9;
-        }
-
-        /* Bouton Google Connexion par défaut */
-        #loginBtn {
-            background-color: var(--accent-color);
-        }
-
-        /* NOUVEAU : Bouton Forcer le réveil configuré en ROUGE */
-        .btn-danger {
-            background-color: var(--accent-color) !important;
-            color: white !important;
-        }
-        .btn-danger:hover {
-            background-color: #cc0000 !important;
-        }
-
-        .status-box {
-            background: #2b2b2b;
-            padding: 10px;
-            border-radius: 6px;
-            font-family: monospace;
-            font-size: 0.8em;
-            border-left: 4px solid var(--accent-color);
-            margin-top: 10px;
-            word-break: break-word;
-        }
-
-        h3 {
-            margin-top: 0;
-            margin-bottom: 12px;
-            font-size: 1.05em;
-        }
-    </style>
-    
-    <script src="https://google.com" async defer></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>Régie Mobile — YouTube</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0f0f0f;--panel:#1f1f1f;--accent:#f00;--text:#f1f1f1;--muted:#b5b5b5;--border:#383838}
+    *{box-sizing:border-box}
+    body{margin:0;padding:12px;background:var(--bg);color:var(--text);font-family:Roboto,Arial,sans-serif;line-height:1.5}
+    .container{max-width:1200px;margin:auto;display:grid;gap:15px}
+    .main-panel{display:flex;flex-direction:column;gap:15px;min-width:0}
+    h1{font-size:1.25rem;margin:0 0 10px}h2{font-size:1.05rem;margin:0 0 12px}
+    .video-container{aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;border:1px solid var(--border)}
+    iframe{display:block;width:100%;height:100%;border:0}
+    .card,.chat-panel{background:var(--panel);border:1px solid var(--border);border-radius:12px}
+    .card{padding:15px;min-width:0}
+    .panel-header{display:flex;justify-content:space-between;align-items:center;gap:10px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--border);font-weight:bold}
+    .chat-panel{height:440px;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+    .chat-panel .panel-header{padding:12px;margin:0}.chat-panel iframe{flex:1;min-height:0}
+    .grid-inputs{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+    label{display:block;margin-bottom:5px;font-size:.9rem;color:var(--muted)}
+    input{width:100%;min-width:0;padding:11px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font:inherit}
+    input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid #8ab4f8;outline-offset:3px}
+    .btn{width:100%;padding:12px;background:#333;color:#fff;border:1px solid var(--border);border-radius:6px;cursor:pointer;font:inherit;font-weight:bold}
+    .btn:hover{filter:brightness(1.15)}.btn:disabled{opacity:.5;cursor:not-allowed}
+    .btn-danger,#loginBtn{background:var(--accent);border-color:var(--accent)}
+    .btn-danger:hover{background:#c00}.compact{width:auto;padding:8px 14px}
+    .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}.actions>*{flex:1}
+    .status-box{background:#292929;padding:12px;border-radius:6px;border-left:4px solid var(--accent);margin-top:12px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.9rem}
+    .note{font-size:.88rem;color:var(--muted);margin:10px 0 0}.warning{border-left:4px solid #edb443;padding-left:12px}
+    a{color:#8ab4f8}summary{cursor:pointer;font-weight:bold}li{margin:8px 0}code{overflow-wrap:anywhere}
+    @media(min-width:600px){.grid-inputs{grid-template-columns:1fr 1fr}}
+    @media(min-width:1000px){.container{grid-template-columns:minmax(0,2fr) minmax(300px,1fr)}.chat-panel{height:650px}}
+  </style>
 </head>
 <body>
-
-<div class="container">
-    <div class="main-panel">
-        
-        <!-- Lecteur natif Iframe -->
-        <div class="video-container" id="mediaWrapper">
-            <iframe id="ytPlayer" src="" allow="autoplay; encrypted-media" allowfullscreen></iframe>
-        </div>
-
-        <div class="card">
-            <div class="panel-header" style="padding:0 0 10px 0;">
-                <span>🔐 Console Google API & Liaison</span>
-                <button class="btn" id="loginBtn" onclick="handleAuthClick()" style="width:auto; padding:8px 15px;">Connexion</button>
-            </div>
-            <div style="margin-top:8px;">
-                <label for="clientIdInput">ID Client OAuth 2.0 :</label>
-                <input type="text" id="clientIdInput" placeholder="Collez l'ID de la console Google Cloud">
-            </div>
-            <div class="grid-inputs" style="margin-top: 5px;">
-                <div>
-                    <label for="videoIdInput">ID Vidéo YouTube :</label>
-                    <input type="text" id="videoIdInput" value="06Ucv-ZcPWg">
-                </div>
-                <div>
-                    <label for="domainInput">Domaine d'Hébergement :</label>
-                    <input type="text" id="domainInput" value="gautiersteed.github.io">
-                </div>
-            </div>
-            <!-- CONFIGURATION : Bouton en classe rouge (btn-danger) -->
-            <button class="btn btn-danger" onclick="updateFramesUrls()" style="margin-top:10px;">🔄 Forcer le réveil du Lecteur</button>
-        </div>
-
-        <div class="card">
-            <h3>⏱️ Horaires Automatiques (Orchestration API Native)</h3>
-            <div class="grid-inputs">
-                <div>
-                    <label for="startTime">Heure de Début :</label>
-                    <input type="datetime-local" id="startTime">
-                </div>
-                <div>
-                    <label for="endTime">Heure de Fin :</label>
-                    <input type="datetime-local" id="endTime">
-                </div>
-            </div>
-            <button class="btn" onclick="scheduleLiveBroadcast()" style="margin-top:15px; background-color: var(--panel-bg); border: 1px solid var(--border-color);">Planifier & Activer la Synchronisation</button>
-            <div class="status-box" id="systemLog">Système : Prêt. En attente d'une action...</div>
-        </div>
-    </div>
-
-    <div class="chat-panel">
+  <h1>🎛️ Régie Mobile — YouTube</h1>
+  <div class="container">
+    <main class="main-panel">
+      <div class="video-container">
+        <iframe id="ytPlayer" title="Lecteur YouTube" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+      </div>
+      <section class="card" aria-labelledby="configTitle">
         <div class="panel-header">
-            <span>💬 Chat en Direct</span>
+          <span id="configTitle">🔐 Configuration et connexion Google</span>
+          <button class="btn compact" id="loginBtn" type="button">Connexion</button>
         </div>
-        <iframe id="ytChat" src=""></iframe>
-    </div>
-</div>
+        <label for="clientIdInput">ID client OAuth 2.0 (application Web)</label>
+        <input id="clientIdInput" type="text" value="963550044765-4p8s9eem280i25pq55f0kurbm1h6dk5t.apps.googleusercontent.com" placeholder="…apps.googleusercontent.com" autocomplete="off" spellcheck="false">
+        <div class="grid-inputs" style="margin-top:12px">
+          <div>
+            <label for="videoIdInput">ID ou URL de la vidéo / du direct existant</label>
+            <input id="videoIdInput" type="text" value="06Ucv-ZcPWg" spellcheck="false">
+          </div>
+          <div>
+            <label for="domainInput">Domaine d’hébergement du chat (sans chemin)</label>
+            <input id="domainInput" type="text" value="gautiersteed.github.io" spellcheck="false">
+          </div>
+        </div>
+        <button class="btn btn-danger" id="reloadBtn" type="button" style="margin-top:12px">🔄 Recharger le lecteur et le chat</button>
+        <p class="note">Le rechargement ne démarre pas une diffusion. La lecture automatique est demandée sans son ; les règles du navigateur peuvent malgré tout la bloquer.</p>
+        <p class="note"><a id="watchLink" href="https://www.youtube.com/watch?v=06Ucv-ZcPWg" target="_blank" rel="noopener noreferrer">Ouvrir sur YouTube ↗</a></p>
+      </section>
+      <section class="card" aria-labelledby="scheduleTitle">
+        <h2 id="scheduleTitle">⏱️ Horaires prévus du direct</h2>
+        <div class="grid-inputs">
+          <div><label for="startTime">Début prévu</label><input id="startTime" type="datetime-local" required></div>
+          <div><label for="endTime">Fin prévue</label><input id="endTime" type="datetime-local" required></div>
+        </div>
+        <p class="note" id="timezoneNote"></p>
+        <div class="actions">
+          <button class="btn" id="inspectBtn" type="button">Vérifier mon direct</button>
+          <button class="btn" id="scheduleBtn" type="button">Enregistrer les horaires sur YouTube</button>
+        </div>
+        <p class="note warning"><strong>Pas de démarrage ou d’arrêt automatique à heure fixe.</strong> Cette page modifie les horaires annoncés d’un direct existant dont vous êtes propriétaire. Elle ne crée pas de direct et n’envoie aucun flux vidéo. Démarrez et terminez la diffusion depuis votre encodeur et YouTube Studio. Les options de démarrage/arrêt automatiques de YouTube dépendent du flux reçu, pas simplement de ces dates.</p>
+        <div class="status-box" id="systemLog" role="status" aria-live="polite">Système : prêt.</div>
+        <div class="actions"><button class="btn" id="logoutBtn" type="button" disabled>Déconnexion Google</button></div>
+      </section>
+      <details class="card">
+        <summary>Mode d’emploi et limites</summary>
+        <ol>
+          <li>Pour le lecteur, indiquez un ID ou un lien YouTube et cliquez sur le bouton rouge. L’intégration doit être autorisée par le propriétaire ; certaines vidéos ne peuvent pas être intégrées.</li>
+          <li>Pour la connexion et la programmation, hébergez ce fichier sur une origine HTTPS, par exemple votre GitHub Pages. Une ouverture locale en <code>file://</code> permet de voir l’interface, mais n’est pas adaptée à OAuth ni au chat intégré.</li>
+          <li>Dans Google Cloud, activez <strong>YouTube Data API v3</strong>, configurez l’écran de consentement et créez un client OAuth de type <strong>Application Web</strong>. Ajoutez l’origine exacte de votre site aux <strong>Origines JavaScript autorisées</strong>, par exemple <code>https://gautiersteed.github.io</code> (sans chemin ni barre finale). Si l’application est en test, ajoutez votre compte aux utilisateurs test. Google peut imposer une vérification pour une diffusion publique de l’application.</li>
+          <li>Collez seulement l’ID client public, jamais un secret client. Connectez le compte qui possède le direct et autorisez la gestion YouTube. La connexion Gmail n’est pas nécessaire.</li>
+          <li>Créez d’abord votre direct dans YouTube Studio, puis utilisez son ID ici. « Vérifier mon direct » consulte son état sans modifier YouTube. L’enregistrement demande confirmation et conserve le titre, la description et la catégorie existants ; il ne change pas la confidentialité.</li>
+          <li>Le domaine du chat doit être le domaine réel de cette page. Le chat peut rester indisponible pour une rediffusion, un direct privé, du contenu destiné aux enfants, ou si YouTube le désactive. Pour écrire, ouvrez YouTube si la connexion ne fonctionne pas dans l’iframe.</li>
+          <li>Vos champs sont mémorisés dans ce navigateur lorsque le stockage est autorisé. Le jeton Google reste uniquement en mémoire et expire ; reconnectez-vous si nécessaire. Aucune action n’est exécutée en arrière-plan lorsque la page est fermée.</li>
+        </ol>
+        <p class="note">Documentation : <a href="https://developers.google.com/youtube/v3/live/docs/liveBroadcasts/update" target="_blank" rel="noopener noreferrer">horaires des directs</a> · <a href="https://developers.google.com/identity/oauth2/web/guides/use-token-model" target="_blank" rel="noopener noreferrer">connexion Google</a>.</p>
+      </details>
+    </main>
+    <aside class="chat-panel" aria-label="Chat du direct">
+      <div class="panel-header">💬 Chat en direct</div>
+      <iframe id="ytChat" title="Chat YouTube en direct" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+    </aside>
+  </div>
+  <script>
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const fields = ['clientIdInput','videoIdInput','domainInput','startTime','endTime'];
+  const storageKey = 'regie-mobile.v2.';
+  const scope = 'https://www.googleapis.com/auth/youtube.force-ssl';
+  let tokenClient = null;
+  let oauthClientId = '';
+  let accessToken = '';
+  let expiresAt = 0;
+  let busy = false;
+  let authPending = false;
+  let storageAvailable = true;
 
-<script>
-    const database = localStorage;
-    const logBox = document.getElementById('systemLog');
-    let tokenClient = null;
-
-    window.addEventListener('DOMContentLoaded', () => {
-        // Initialisation de la mémoire locale de l'appareil si elle est vide
-        if (!database.getItem('videoIdInput')) {
-            database.setItem('videoIdInput', '06Ucv-ZcPWg');
-        }
-        if (!database.getItem('domainInput')) {
-            database.setItem('domainInput', 'gautiersteed.github.io');
-        }
-
-        const fields = ['clientIdInput', 'videoIdInput', 'domainInput', 'startTime', 'endTime'];
-        fields.forEach(id => {
-            const element = document.getElementById(id);
-            if (element) {
-                if (database.getItem(id)) {
-                    element.value = database.getItem(id);
-                }
-                element.addEventListener('input', saveData);
+  function log(message) {
+    $('systemLog').textContent = '[' + new Date().toLocaleTimeString('fr-FR') + '] ' + message;
+  }
+  function saveField(element) {
+    try { localStorage.setItem(storageKey + element.id, element.value); }
+    catch (_) { storageAvailable = false; }
+  }
+  function videoIdFrom(value) {
+    const text = value.trim();
+    if (/^[\w-]{11}$/.test(text)) return text;
+    try {
+      const url = new URL(/^https?:\/\//i.test(text) ? text : 'https://' + text);
+      const host = url.hostname.toLowerCase();
+      let id = '';
+      if (host === 'youtu.be') id = url.pathname.split('/')[1];
+      else if (['youtube.com','www.youtube.com','m.youtube.com','music.youtube.com','www.youtube-nocookie.com','youtube-nocookie.com'].includes(host)) {
+        id = url.searchParams.get('v') || (/^\/(live|embed|shorts)\//.test(url.pathname) ? url.pathname.split('/')[2] : '');
+      }
+      if (/^[\w-]{11}$/.test(id || '')) return id;
+    } catch (_) {}
+    throw new Error('Indiquez un ID YouTube de 11 caractères ou un lien YouTube valide.');
+  }
+  function hostingDomain(value) {
+    const raw = value.trim();
+    if (!raw) throw new Error('Renseignez le domaine réel d’hébergement pour le chat.');
+    const url = new URL(/^https?:\/\//i.test(raw) ? raw : 'https://' + raw);
+    if (!['http:','https:'].includes(url.protocol) || url.username || url.password || !url.hostname || url.pathname !== '/' || url.search || url.hash) {
+      throw new Error('Le domaine doit être sans chemin, paramètres ou identifiants.');
+    }
+    return url.hostname;
+  }
+  function updateFramesUrls() {
+    try {
+      const id = videoIdFrom($('videoIdInput').value);
+      const player = new URL('https://www.youtube.com/embed/' + id);
+      player.search = new URLSearchParams({autoplay:'1',mute:'1',playsinline:'1'}).toString();
+      // Pas d’enablejsapi : aucun pilotage du lecteur par JavaScript n’est utilisé.
+      $('ytPlayer').src = player.href;
+      $('watchLink').href = 'https://www.youtube.com/watch?v=' + id;
+      let domain;
+      try { domain = hostingDomain($('domainInput').value); }
+      catch (error) { $('ytChat').src = 'about:blank'; throw error; }
+      const chat = new URL('https://www.youtube.com/live_chat');
+      chat.search = new URLSearchParams({v:id,embed_domain:domain,dark_theme:'1'}).toString();
+      $('ytChat').src = chat.href;
+      fields.forEach(id => saveField($(id)));
+      let message = 'Lecteur et chat rechargés. Leur disponibilité dépend de YouTube.';
+      if (!['http:','https:'].includes(location.protocol)) message += ' Fichier local : hébergez la page en HTTPS pour OAuth et le chat.';
+      else if (domain !== location.hostname) message += ' Attention : le domaine du chat ne correspond pas au domaine actuel (' + location.hostname + ').';
+      if (!storageAvailable) message += ' Mémorisation locale indisponible.';
+      log(message);
+    } catch (error) { log('❌ ' + error.message); }
+  }
+  function refreshAuthUI() {
+    const valid = Boolean(accessToken && Date.now() < expiresAt);
+    $('loginBtn').textContent = authPending ? 'Connexion…' : valid ? 'Reconnecter' : 'Connexion';
+    $('loginBtn').disabled = busy || authPending;
+    $('logoutBtn').disabled = !accessToken || busy || authPending;
+    $('scheduleBtn').disabled = busy || authPending;
+    $('inspectBtn').disabled = busy || authPending;
+    ['clientIdInput','videoIdInput','startTime','endTime'].forEach(id => { $(id).disabled = busy || authPending; });
+  }
+  function clearAuth() {
+    accessToken = '';
+    expiresAt = 0;
+    refreshAuthUI();
+  }
+  function handleAuthClick() {
+    try {
+      if (!['https:','http:'].includes(location.protocol)) throw new Error('Hébergez la page en HTTPS pour utiliser la connexion Google.');
+      if (!window.google?.accounts?.oauth2) throw new Error('Le module Google n’est pas chargé. Vérifiez Internet ou votre bloqueur, puis réessayez.');
+      const id = $('clientIdInput').value.trim();
+      if (!/^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(id)) throw new Error('L’ID client OAuth doit se terminer par .apps.googleusercontent.com.');
+      saveField($('clientIdInput'));
+      if (!tokenClient || oauthClientId !== id) {
+        clearAuth();
+        oauthClientId = id;
+        tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id:id, scope,
+          callback:response => {
+            authPending = false;
+            if (response.error || !response.access_token) {
+              clearAuth();log('❌ Connexion refusée : ' + (response.error_description || response.error || 'jeton absent'));return;
             }
+            if (!google.accounts.oauth2.hasGrantedAllScopes(response, scope)) {
+              clearAuth();log('❌ Autorisation YouTube manquante. Reconnectez-vous en accordant cette autorisation.');return;
+            }
+            accessToken = response.access_token;
+            expiresAt = Date.now() + Math.max(0, (Number(response.expires_in) || 3600) - 60) * 1000;
+            refreshAuthUI();log('✅ Connecté à Google. Vous pouvez vérifier votre direct ou enregistrer ses horaires.');
+          },
+          error_callback:error => {
+            authPending = false;refreshAuthUI();log('❌ Connexion interrompue : ' + (error.type || 'fenêtre bloquée ou fermée'));
+          }
         });
-        
-        // Premier réveil automatique au chargement
-        updateFramesUrls();
+      }
+      authPending = true;refreshAuthUI();
+      tokenClient.requestAccessToken({prompt:'consent'});
+    } catch (error) { authPending = false;refreshAuthUI();log('❌ ' + error.message); }
+  }
+  function requireToken() {
+    if (!accessToken || Date.now() >= expiresAt) {
+      clearAuth();throw new Error('Connectez-vous à Google (ou reconnectez-vous : la session a expiré).');
+    }
+  }
+  async function youtube(path, params, options = {}) {
+    requireToken();
+    const url = new URL('https://www.googleapis.com/youtube/v3/' + path);
+    url.search = new URLSearchParams(params).toString();
+    const response = await fetch(url, {
+      ...options,
+      headers:{Authorization:'Bearer ' + accessToken, ...(options.body ? {'Content-Type':'application/json'} : {})},
+      signal:AbortSignal.timeout(30000)
     });
-
-    function saveData() {
-        database.setItem(this.id, this.value);
-        if (this.id === 'videoIdInput' || this.id === 'domainInput') {
-            updateFramesUrls();
-        }
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (response.status === 401) clearAuth();
+      const reason = data.error?.errors?.[0]?.reason || '';
+      throw new Error('YouTube ' + response.status + (reason ? ' (' + reason + ')' : '') + ' : ' + (data.error?.message || response.statusText));
     }
-
-    function log(message) {
-        logBox.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+    return data;
+  }
+  async function getBroadcast(id) {
+    const data = await youtube('liveBroadcasts',{part:'snippet,status',id});
+    const broadcast = data.items?.[0];
+    if (!broadcast) throw new Error('Aucun direct accessible avec cet ID. Vérifiez le compte propriétaire et l’ID du direct (une vidéo ordinaire ne convient pas).');
+    return broadcast;
+  }
+  async function runAction(action) {
+    if (busy) return;
+    busy = true;refreshAuthUI();
+    try { await action(); }
+    catch (error) { log('❌ ' + (error.name === 'TimeoutError' ? 'Délai dépassé. Vérifiez l’état dans YouTube Studio avant de réessayer.' : error.message)); }
+    finally { busy = false;refreshAuthUI(); }
+  }
+  async function inspectBroadcast() {
+    await runAction(async () => {
+      log('Consultation du direct…');
+      const broadcast = await getBroadcast(videoIdFrom($('videoIdInput').value));
+      const snippet = broadcast.snippet;
+      const format = value => value ? new Date(value).toLocaleString('fr-FR') : 'non renseigné';
+      log('✅ ' + snippet.title + '\nÉtat YouTube : ' + broadcast.status.lifeCycleStatus + '\nDébut prévu : ' + format(snippet.scheduledStartTime) + '\nFin prévue : ' + format(snippet.scheduledEndTime));
+    });
+  }
+  async function scheduleLiveBroadcast() {
+    await runAction(async () => {
+      requireToken();
+      const id = videoIdFrom($('videoIdInput').value);
+      const start = new Date($('startTime').value);
+      const end = new Date($('endTime').value);
+      if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) throw new Error('Renseignez deux dates valides.');
+      if (start.getTime() <= Date.now()) throw new Error('Le début doit être dans le futur.');
+      if (end <= start) throw new Error('La fin doit être postérieure au début.');
+      log('Vérification du direct avant modification…');
+      const broadcast = await getBroadcast(id);
+      if (!['created','ready'].includes(broadcast.status.lifeCycleStatus)) throw new Error('Cette interface ne reprogramme que les directs à venir (état created ou ready).');
+      if (!window.confirm('Modifier les horaires du direct « ' + broadcast.snippet.title + ' » ?\nDébut : ' + start.toLocaleString('fr-FR') + '\nFin : ' + end.toLocaleString('fr-FR') + '\n\nCes dates ne déclenchent pas automatiquement la diffusion.')) {
+        log('Modification annulée.');return;
+      }
+      // Ne modifier que snippet ; conserver tous ses champs modifiables déjà présents.
+      const snippet = {title:broadcast.snippet.title,scheduledStartTime:start.toISOString(),scheduledEndTime:end.toISOString()};
+      for (const key of ['description','categoryId']) {
+        if (broadcast.snippet[key] !== undefined) snippet[key] = broadcast.snippet[key];
+      }
+      await youtube('liveBroadcasts',{part:'snippet'},{method:'PUT',body:JSON.stringify({id,snippet})});
+      fields.forEach(id => saveField($(id)));
+      log('✅ Horaires enregistrés sur YouTube pour « ' + snippet.title + ' ».\nLe démarrage et l’arrêt réels restent à gérer via l’encodeur et YouTube Studio.');
+    });
+  }
+  function logout() {
+    const oldToken = accessToken;
+    clearAuth();
+    if (oldToken && window.google?.accounts?.oauth2) {
+      try { google.accounts.oauth2.revoke(oldToken, () => {}); } catch (_) {}
     }
-
-    // CORRECTION : Résolution complète de la fonction coupée et sécurisation des variables du DOM
-    function updateFramesUrls() {
-        const videoIdField = document.getElementById('videoIdInput');
-        const domainField = document.getElementById('domainInput');
-        const playerFrame = document.getElementById('ytPlayer');
-        const chatFrame = document.getElementById('ytChat');
-
-        if (!videoIdField || !domainField || !playerFrame || !chatFrame) {
-            log("❌ Erreur : Structure du DOM brisée ou manquante.");
-            return;
-        }
-
-        const videoId = videoIdField.value.trim();
-        const domain = domainField.value.trim();
-
-        if (!videoId) {
-            log("❌ Erreur : Aucun ID de vidéo YouTube renseigné.");
-            return;
-        }
-
-        // Mise à jour sécurisée de l'iframe vidéo
-        playerFrame.src = `https://youtube.com{videoId}?autoplay=1&origin=https://${domain}&enablejsapi=1`;
-
-        // Mise à jour de l'iframe Chat en direct
-        if (domain) {
+    log('Déconnecté dans cette page ; révocation demandée à Google.');
+  }
+  fields.forEach(id => {
+    const element = $(id);
+    try { const value = localStorage.getItem(storageKey + id); if (value !== null) element.value = value; }
+    catch (_) { storageAvailable = false; }
+    element.addEventListener('input', () => {
+      saveField(element);
+      if (id === 'clientIdInput') { clearAuth();tokenClient = null;oauthClientId = ''; }
+    });
+  });
+  $('timezoneNote').textContent = 'Dates dans le fuseau de cet appareil : ' + Intl.DateTimeFormat().resolvedOptions().timeZone + '. Elles sont converties en UTC pour YouTube.';
+  $('loginBtn').addEventListener('click',handleAuthClick);
+  $('reloadBtn').addEventListener('click',updateFramesUrls);
+  $('inspectBtn').addEventListener('click',inspectBroadcast);
+  $('scheduleBtn').addEventListener('click',scheduleLiveBroadcast);
+  $('logoutBtn').addEventListener('click',logout);
+  refreshAuthUI();
+  updateFramesUrls();
+  </script>
+  <script src="https://accounts.google.com/gsi/client" async defer onerror="log('❌ Module Google indisponible. Le lecteur reste utilisable ; vérifiez votre connexion et vos bloqueurs pour OAuth.');"></script>
+</body>
+</html>
