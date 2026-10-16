@@ -52,7 +52,7 @@
             width: 100%;
         }
 
-        .video-container iframe {
+        .video-container iframe, .video-container div {
             position: absolute;
             top: 0;
             left: 0;
@@ -166,6 +166,7 @@
             font-size: 1.05em;
         }
     </style>
+    <!-- Balises d'API officielles recommandées par Google -->
     <script src="https://google.com" async defer></script>
 </head>
 <body>
@@ -173,9 +174,9 @@
 <div class="container">
     <div class="main-panel">
         
-        <!-- Le lecteur Iframe d'origine qui fonctionnait -->
+        <!-- Emplacement sécurisé pour injecter le lecteur de manière officielle -->
         <div class="video-container" id="mediaWrapper">
-            <iframe id="ytPlayer" src="" allowfullscreen></iframe>
+            <div id="player"></div>
         </div>
 
         <div class="card">
@@ -197,7 +198,7 @@
                     <input type="text" id="domainInput" value="gautiersteed.github.io">
                 </div>
             </div>
-            <button class="btn btn-warning" onclick="updateFramesUrls()" style="margin-top:10px;">🔄 Forcer le réveil du Lecteur</button>
+            <button class="btn btn-warning" onclick="loadYouTubePlayer()" style="margin-top:10px;">🔄 Forcer le réveil du Lecteur</button>
         </div>
 
         <div class="card">
@@ -228,6 +229,13 @@
 <script>
     const database = localStorage;
     const logBox = document.getElementById('systemLog');
+    let ytPlayer = null;
+
+    // Charger l'API YouTube officielle de manière asynchrone pour éviter l'écran gris
+    const tag = document.createElement('script');
+    tag.src = "https://youtube.com";
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
     window.addEventListener('DOMContentLoaded', () => {
         if (!database.getItem('videoIdInput') || database.getItem('videoIdInput') === 'VIDEO_ID') {
@@ -244,14 +252,12 @@
             }
             document.getElementById(id).addEventListener('input', saveData);
         });
-        
-        updateFramesUrls();
     });
 
     function saveData() {
         database.setItem(this.id, this.value);
         if(this.id === 'videoIdInput' || this.id === 'domainInput') {
-            updateFramesUrls();
+            loadYouTubePlayer();
         }
     }
 
@@ -259,14 +265,42 @@
         logBox.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
     }
 
-    function updateFramesUrls() {
+    // Se déclenche dès que l'API de Google est prête à afficher la vidéo
+    function onYouTubeIframeAPIReady() {
+        loadYouTubePlayer();
+    }
+
+    function loadYouTubePlayer() {
         const videoId = document.getElementById('videoIdInput').value.trim();
         const domain = document.getElementById('domainInput').value.trim();
-        
-        // Retour à l'intégration iframe simple avec option playsinline=1 pour forcer l'affichage sur mobile
-        document.getElementById('ytPlayer').src = `https://youtube.com{videoId}?autoplay=1&loop=1&playlist=${videoId}&mute=1&playsinline=1`;
+
+        // Détruire l'ancien lecteur s'il existe pour éviter les conflits matériels
+        if (ytPlayer) {
+            try { ytPlayer.destroy(); } catch(e) {}
+        }
+
+        // Création propre et officielle approuvée par Google Chrome Mobile et Android
+        ytPlayer = new YT.Player('player', {
+            videoId: videoId,
+            playerVars: {
+                'autoplay': 1,
+                'loop': 1,
+                'playlist': videoId,
+                'mute': 1,
+                'playsinline': 1, // Force la vidéo à rester sur votre page et empêche l'écran gris
+                'rel': 0,
+                'controls': 1
+            },
+            events: {
+                'onReady': (e) => {
+                    e.target.playVideo();
+                    log("✅ Lecteur officiel connecté et actif.");
+                }
+            }
+        });
+
+        // Mise à jour du lien de chat
         document.getElementById('ytChat').src = `https://youtube.com{videoId}&embed_domain=${domain}`;
-        log("🔄 Lecteurs synchronisés.");
     }
 
     function handleAuthClick() {
@@ -275,14 +309,3 @@
 
     function scheduleLiveBroadcast() {
         const start = document.getElementById('startTime').value;
-        const end = document.getElementById('endTime').value;
-        if(!start || !end) {
-            log("❌ Erreur : Spécifiez des horaires valides.");
-            return;
-        }
-        log(`📡 Commande transmise à YouTube (enableAutoStart/End configuré).`);
-    }
-</script>
-
-</body>
-</html>
