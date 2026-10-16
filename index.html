@@ -52,13 +52,12 @@
             width: 100%;
         }
 
-        .video-container iframe {
+        .video-container div {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            border: 0;
         }
 
         .chat-panel {
@@ -166,19 +165,20 @@
             font-size: 1.05em;
         }
     </style>
+    <!-- Chargement officiel des scripts d'API de sécurité Google -->
     <script src="https://google.com" async defer></script>
+    <script src="https://youtube.com"></script>
 </head>
 <body>
 
 <div class="container">
     <div class="main-panel">
         
-        <!-- Zone Vidéo épurée -->
+        <!-- Conteneur Vidéo pour l'injection API -->
         <div class="video-container" id="mediaWrapper">
-            <iframe id="ytPlayer" src="" allowfullscreen></iframe>
+            <div id="player"></div>
         </div>
 
-        <!-- Paramètres et Authentification API Cloud -->
         <div class="card">
             <div class="panel-header" style="padding:0 0 10px 0;">
                 <span>🔐 Console Google API & Connexion</span>
@@ -198,10 +198,9 @@
                     <input type="text" id="domainInput" value="gautiersteed.github.io">
                 </div>
             </div>
-            <button class="btn btn-warning" onclick="updateFramesUrls()" style="margin-top:10px;">🔄 Forcer le réveil du Lecteur</button>
+            <button class="btn btn-warning" onclick="forcePlayerReset()" style="margin-top:10px;">🔄 Forcer le réveil du Lecteur</button>
         </div>
 
-        <!-- Programmation et Statut -->
         <div class="card">
             <h3>⏱️ Horaires Automatiques YouTube (Orchestration Native)</h3>
             <div class="grid-inputs">
@@ -219,10 +218,9 @@
         </div>
     </div>
 
-    <!-- Panneau de Chat -->
     <div class="chat-panel">
         <div class="panel-header">
-            <span>💬 Chat en Direct</span>
+            <span>💬 Chat en Direct (Actif uniquement lors d'un live)</span>
         </div>
         <iframe id="ytChat" src=""></iframe>
     </div>
@@ -231,9 +229,9 @@
 <script>
     const database = localStorage;
     const logBox = document.getElementById('systemLog');
+    let ytPlayerNode;
 
     window.addEventListener('DOMContentLoaded', () => {
-        // Initialisation des valeurs par défaut si la mémoire est vide
         if (!database.getItem('videoIdInput') || database.getItem('videoIdInput') === 'VIDEO_ID') {
             database.setItem('videoIdInput', '06Ucv-ZcPWg');
         }
@@ -248,14 +246,12 @@
             }
             document.getElementById(id).addEventListener('input', saveData);
         });
-        
-        updateFramesUrls();
     });
 
     function saveData() {
         database.setItem(this.id, this.value);
         if(this.id === 'videoIdInput' || this.id === 'domainInput') {
-            updateFramesUrls();
+            forcePlayerReset();
         }
     }
 
@@ -263,14 +259,41 @@
         logBox.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
     }
 
-    function updateFramesUrls() {
+    // Cette fonction est appelée automatiquement par le script de sécurité YouTube
+    function onYouTubeIframeAPIReady() {
+        forcePlayerReset();
+    }
+
+    function forcePlayerReset() {
         const videoId = document.getElementById('videoIdInput').value.trim();
         const domain = document.getElementById('domainInput').value.trim();
-        
-        // Forcer le rechargement avec sourdine pour contourner les blocages de sécurité des smartphones
-        document.getElementById('ytPlayer').src = `https://youtube.com{videoId}?autoplay=1&loop=1&playlist=${videoId}&mute=1`;
+
+        // Réinitialisation matérielle propre du lecteur via l'API officielle
+        if(ytPlayerNode) {
+            try { ytPlayerNode.destroy(); } catch(e) {}
+        }
+
+        ytPlayerNode = new YT.Player('player', {
+            height: '100%',
+            width: '100%',
+            videoId: videoId,
+            playerVars: {
+                'autoplay': 1,
+                'loop': 1,
+                'playlist': videoId,
+                'mute': 1,
+                'playsinline': 1 // Obligatoire pour forcer l'affichage interne sur les applications mobiles / APK
+            },
+            events: {
+                'onReady': (event) => {
+                    event.target.playVideo();
+                    log("✅ Lecteur officiel YouTube réveillé et connecté.");
+                }
+            }
+        });
+
+        // Mise à jour de l'adresse du chat
         document.getElementById('ytChat').src = `https://youtube.com{videoId}&embed_domain=${domain}`;
-        log("🔄 Lecteurs synchronisés en mémoire locale.");
     }
 
     function handleAuthClick() {
@@ -284,7 +307,7 @@
             log("❌ Erreur : Spécifiez des horaires valides.");
             return;
         }
-        log(`📡 Commande transmise à YouTube (enableAutoStart/End configuré pour le flux).`);
+        log(`📡 Commande transmise à YouTube (enableAutoStart/End configuré).`);
     }
 </script>
 
