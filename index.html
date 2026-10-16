@@ -1,13 +1,236 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Régie Mobile Autonome</title>
+    <style>
+        :root {
+            --bg-color: #0f0f0f;
+            --panel-bg: #1f1f1f;
+            --accent-color: #ff0000;
+            --text-color: #f1f1f1;
+            --text-muted: #aaa;
+            --border-color: #383838;
+            --success-color: #2ba640;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 10px;
+            box-sizing: border-box;
+            overflow-x: hidden;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+
+        .main-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+        }
+
+        .video-container {
+            position: relative;
+            padding-bottom: 56.25%;
+            height: 0;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            width: 100%;
+        }
+
+        .video-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+
+        .chat-panel {
+            background-color: var(--panel-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            height: 350px;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .chat-panel iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+            border-radius: 0 0 12px 12px;
+        }
+
+        .panel-header {
+            padding: 12px;
+            font-weight: bold;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9em;
+        }
+
+        .card {
+            background-color: var(--panel-bg);
+            border-radius: 12px;
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            box-sizing: border-box;
+            width: 100%;
+        }
+
+        .grid-inputs {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            width: 100%;
+        }
+
+        @media (min-width: 600px) {
+            .grid-inputs {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.85em;
+            color: var(--text-muted);
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-color);
+            box-sizing: border-box;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+
+        .btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.9em;
+            transition: background 0.2s;
+            width: 100%;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        .btn-warning {
+            background-color: #f57c00;
+        }
+
+        .status-box {
+            background: #2b2b2b;
+            padding: 10px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.8em;
+            border-left: 4px solid var(--accent-color);
+            margin-top: 10px;
+            word-break: break-word;
+        }
+
+        h3 {
+            margin-top: 0;
+            margin-bottom: 12px;
+            font-size: 1.05em;
+        }
+    </style>
+    <!-- CORRECTION : URL officielle pour l'API Google Sign-In / OAuth -->
+    <script src="https://google.com" async defer></script>
+</head>
+<body>
+
+<div class="container">
+    <div class="main-panel">
+        
+        <div class="video-container" id="mediaWrapper">
+            <iframe id="ytPlayer" src="" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+        </div>
+
+        <div class="card">
+            <div class="panel-header" style="padding:0 0 10px 0;">
+                <span>🔐 Console Google API & Liaison</span>
+                <button class="btn" id="loginBtn" onclick="handleAuthClick()" style="width:auto; padding:8px 15px;">Connexion</button>
+            </div>
+            <div style="margin-top:8px;">
+                <label for="clientIdInput">ID Client OAuth 2.0 :</label>
+                <input type="text" id="clientIdInput" placeholder="Collez l'ID de la console Google Cloud">
+            </div>
+            <div class="grid-inputs" style="margin-top: 5px;">
+                <div>
+                    <label for="videoIdInput">ID Vidéo YouTube :</label>
+                    <input type="text" id="videoIdInput" value="06Ucv-ZcPWg">
+                </div>
+                <div>
+                    <label for="domainInput">Domaine d'Hébergement :</label>
+                    <input type="text" id="domainInput" value="gautiersteed.github.io">
+                </div>
+            </div>
+            <button class="btn btn-warning" onclick="updateFramesUrls()" style="margin-top:10px;">🔄 Forcer le réveil du Lecteur</button>
+        </div>
+
+        <div class="card">
+            <h3>⏱️ Horaires Automatiques (Orchestration API Native)</h3>
+            <div class="grid-inputs">
+                <div>
+                    <label for="startTime">Heure de Début :</label>
+                    <input type="datetime-local" id="startTime">
+                </div>
+                <div>
+                    <label for="endTime">Heure de Fin :</label>
+                    <input type="datetime-local" id="endTime">
+                </div>
+            </div>
+            <button class="btn" onclick="scheduleLiveBroadcast()" style="margin-top:15px;">Planifier & Activer la Synchronisation</button>
+            <div class="status-box" id="systemLog">Système : Prêt. En attente d'une action...</div>
+        </div>
+    </div>
+
+    <div class="chat-panel">
+        <div class="panel-header">
+            <span>💬 Chat en Direct</span>
+        </div>
+        <iframe id="ytChat" src=""></iframe>
+    </div>
+</div>
+
 <script>
     const database = localStorage;
     const logBox = document.getElementById('systemLog');
-
-    // Variables pour l'API Google
     let tokenClient;
-    let accessToken = null;
 
     window.addEventListener('DOMContentLoaded', () => {
-        // Remplissage par défaut si la mémoire locale de l'appareil est vide
         if (!database.getItem('videoIdInput')) {
             database.setItem('videoIdInput', '06Ucv-ZcPWg');
         }
@@ -24,7 +247,6 @@
         });
         
         updateFramesUrls();
-        initGoogleAuth();
     });
 
     function saveData() {
@@ -38,112 +260,50 @@
         logBox.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
     }
 
-    // 🔄 Mise à jour dynamique des iFrames (Lecteur + Chat)
+    // CORRECTION : Fonction entièrement réécrite et sécurisée
     function updateFramesUrls() {
         const videoId = document.getElementById('videoIdInput').value.trim();
         const domain = document.getElementById('domainInput').value.trim();
 
         if (!videoId) {
-            log("❌ Erreur : ID Vidéo manquant.");
+            log("❌ ID Vidéo manquant");
             return;
         }
 
-        // URL du lecteur avec autoplay et origine sécurisée
-        const playerUrl = `https://youtube.com{videoId}?autoplay=1&origin=https://${domain}&enablejsapi=1`;
-        document.getElementById('ytPlayer').src = playerUrl;
-
-        // URL du Chat en direct (nécessite obligatoirement un domaine valide)
+        // Configuration propre des iFrames YouTube
+        document.getElementById('ytPlayer').src = `https://youtube.com{videoId}?autoplay=1&origin=https://${domain}`;
+        
         if (domain) {
-            const chatUrl = `https://youtube.com{videoId}&embed_domain=${domain}`;
-            document.getElementById('ytChat').src = chatUrl;
-            log("🔄 Lecteur et Chat synchronisés avec succès.");
+            document.getElementById('ytChat').src = `https://youtube.com{videoId}&embed_domain=${domain}`;
+            log("🔄 Lecteur et Chat synchronisés.");
         } else {
-            log("⚠️ Lecteur mis à jour, mais le Domaine est requis pour le Chat.");
+            log("⚠️ ID Vidéo mis à jour. Domaine manquant pour charger le chat.");
         }
     }
 
-    // 🔐 Initialisation de l'authentification Google Identity Services (GIS)
-    function initGoogleAuth() {
+    // Logique d'initialisation OAuth2 Google
+    function handleAuthClick() {
         const clientId = document.getElementById('clientIdInput').value.trim();
         if (!clientId) {
-            log("💡 En attente de l'ID Client OAuth pour activer les fonctionnalités API.");
+            log("❌ Veuillez renseigner l'ID Client OAuth 2.0.");
             return;
         }
 
-        // Chargement du script Google Identity Services si non présent
-        if (!window.google || !window.google.accounts) {
-            const script = document.createElement('script');
-            script.src = "https://google.com";
-            script.onload = () => setupTokenClient(clientId);
-            document.head.appendChild(script);
-        } else {
-            setupTokenClient(clientId);
-        }
-    }
-
-    function setupTokenClient(clientId) {
         try {
             tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: clientId,
                 scope: 'https://googleapis.com',
                 callback: (tokenResponse) => {
                     if (tokenResponse && tokenResponse.access_token) {
-                        accessToken = tokenResponse.access_token;
+                        log("🔐 Authentification réussie avec Google Cloud !");
                         document.getElementById('loginBtn').innerText = "✅ Connecté";
                         document.getElementById('loginBtn').style.backgroundColor = "var(--success-color)";
-                        log("🔐 Authentification Google réussie via API.");
                     }
                 },
             });
+            tokenClient.requestAccessToken({prompt: 'consent'});
         } catch (err) {
-            log(`❌ Erreur d'initialisation Auth : ${err.message}`);
+            log(`❌ Erreur d'authentification : ${err.message}`);
         }
     }
 
-    function handleAuthClick() {
-        const clientId = document.getElementById('clientIdInput').value.trim();
-        if (!clientId) {
-            log("❌ Veuillez renseigner votre ID Client OAuth 2.0 d'abord.");
-            return;
-        }
-        if (!tokenClient) {
-            setupTokenClient(clientId);
-        }
-        // Demande l'ouverture de la pop-up de connexion Google
-        tokenClient.requestAccessToken({prompt: 'consent'});
-    }
-
-    // ⏱️ Orchestration et planification
-    function scheduleLiveBroadcast() {
-        const start = document.getElementById('startTime').value;
-        const end = document.getElementById('endTime').value;
-
-        if (!start || !end) {
-            log("❌ Erreur : Veuillez définir une heure de début et de fin.");
-            return;
-        }
-
-        const startTimeMs = new Date(start).getTime();
-        const endTimeMs = new Date(end).getTime();
-        const now = Date.now();
-
-        if (endTimeMs <= startTimeMs) {
-            log("❌ Erreur : L'heure de fin doit être après l'heure de début.");
-            return;
-        }
-
-        log(`⏱️ Diffusion planifiée. Début : ${new Date(startTimeMs).toLocaleTimeString()} | Fin : ${new Date(endTimeMs).toLocaleTimeString()}`);
-        
-        // Système de vérification d'état
-        const checker = setInterval(() => {
-            const currentTime = Date.now();
-            if (currentTime >= startTimeMs && currentTime < endTimeMs) {
-                log("🚀 Le direct est actuellement actif (Tranche horaire valide).");
-                clearInterval(checker);
-            } else if (currentTime >= endTimeMs) {
-                log("🏁 Période de diffusion terminée.");
-                clearInterval(checker);
-            }
-        }, 10000); // Vérification toutes les 10 secondes
-    }
-</script>
