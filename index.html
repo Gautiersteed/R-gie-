@@ -164,6 +164,10 @@
             background-color: var(--success-color);
         }
 
+        .btn-warning {
+            background-color: #f57c00;
+        }
+
         .codec-badge {
             background-color: #0056b3;
             color: #fff;
@@ -214,13 +218,14 @@
             <div class="grid-inputs" style="margin-top: 5px;">
                 <div>
                     <label for="videoIdInput">ID Vidéo YouTube :</label>
-                    <input type="text" id="videoIdInput" value="VIDEO_ID">
+                    <input type="text" id="videoIdInput" value="06Ucv-ZcPWg">
                 </div>
                 <div>
                     <label for="domainInput">Domaine d'Hébergement :</label>
                     <input type="text" id="domainInput" value="gautiersteed.github.io">
                 </div>
             </div>
+            <button class="btn btn-warning" onclick="updateFramesUrls()" style="margin-top:10px;">🔄 Forcer le réveil du Lecteur</button>
         </div>
 
         <div class="card">
@@ -271,7 +276,7 @@
                 <button class="btn" onclick="scheduleLiveBroadcast()">Planifier le Live</button>
                 <button class="btn btn-success" id="streamBtn" onclick="startDirectStreaming()">Flux Immédiat</button>
             </div>
-            <div class="status-box" id="systemLog">Système : En attente du signal...</div>
+            <div class="status-box" id="systemLog">Système : Prêt. En attente d'une action...</div>
         </div>
     </div>
 
@@ -290,26 +295,14 @@
     let videoEncoder;
 
     window.addEventListener('DOMContentLoaded', () => {
+        // Forcer la valeur par défaut si vide ou si c'est l'ancien texte VIDEO_ID
+        if (!database.getItem('videoIdInput') || database.getItem('videoIdInput') === 'VIDEO_ID') {
+            database.setItem('videoIdInput', '06Ucv-ZcPWg');
+        }
+        if (!database.getItem('domainInput')) {
+            database.setItem('domainInput', 'gautiersteed.github.io');
+        }
+
         const fields = ['clientIdInput', 'videoIdInput', 'domainInput', 'startTime', 'endTime', 'audioCodecSelect'];
         fields.forEach(id => {
             if(database.getItem(id)) {
-                document.getElementById(id).value = database.getItem(id);
-            }
-            document.getElementById(id).addEventListener('input', saveData);
-        });
-        updateFramesUrls();
-        toggleCodecBadge();
-    });
-
-    function saveData() {
-        database.setItem(this.id, this.value);
-        if(this.id === 'videoIdInput' || this.id === 'domainInput') {
-            updateFramesUrls();
-        }
-    }
-
-    function log(message) {
-        logBox.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
-    }
-
-    function toggleCodecBadge() {
