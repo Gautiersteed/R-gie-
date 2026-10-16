@@ -52,12 +52,13 @@
             width: 100%;
         }
 
-        .video-container div {
+        .video-container iframe {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
+            border: 0;
         }
 
         .chat-panel {
@@ -165,28 +166,26 @@
             font-size: 1.05em;
         }
     </style>
-    <!-- Chargement officiel des scripts d'API de sécurité Google -->
     <script src="https://google.com" async defer></script>
-    <script src="https://youtube.com"></script>
 </head>
 <body>
 
 <div class="container">
     <div class="main-panel">
         
-        <!-- Conteneur Vidéo pour l'injection API -->
+        <!-- Le lecteur Iframe d'origine qui fonctionnait -->
         <div class="video-container" id="mediaWrapper">
-            <div id="player"></div>
+            <iframe id="ytPlayer" src="" allowfullscreen></iframe>
         </div>
 
         <div class="card">
             <div class="panel-header" style="padding:0 0 10px 0;">
-                <span>🔐 Console Google API & Connexion</span>
+                <span>🔐 Console Google API & App</span>
                 <button class="btn" id="loginBtn" onclick="handleAuthClick()" style="width:auto; padding:8px 15px;">Connexion</button>
             </div>
             <div style="margin-top:8px;">
                 <label for="clientIdInput">ID Client OAuth 2.0 :</label>
-                <input type="text" id="clientIdInput" placeholder="Collez votre ID Google Cloud">
+                <input type="text" id="clientIdInput" placeholder="Collez l'ID de la console Google">
             </div>
             <div class="grid-inputs" style="margin-top: 5px;">
                 <div>
@@ -198,7 +197,7 @@
                     <input type="text" id="domainInput" value="gautiersteed.github.io">
                 </div>
             </div>
-            <button class="btn btn-warning" onclick="forcePlayerReset()" style="margin-top:10px;">🔄 Forcer le réveil du Lecteur</button>
+            <button class="btn btn-warning" onclick="updateFramesUrls()" style="margin-top:10px;">🔄 Forcer le réveil du Lecteur</button>
         </div>
 
         <div class="card">
@@ -220,7 +219,7 @@
 
     <div class="chat-panel">
         <div class="panel-header">
-            <span>💬 Chat en Direct (Actif uniquement lors d'un live)</span>
+            <span>💬 Chat en Direct</span>
         </div>
         <iframe id="ytChat" src=""></iframe>
     </div>
@@ -229,7 +228,6 @@
 <script>
     const database = localStorage;
     const logBox = document.getElementById('systemLog');
-    let ytPlayerNode;
 
     window.addEventListener('DOMContentLoaded', () => {
         if (!database.getItem('videoIdInput') || database.getItem('videoIdInput') === 'VIDEO_ID') {
@@ -246,12 +244,14 @@
             }
             document.getElementById(id).addEventListener('input', saveData);
         });
+        
+        updateFramesUrls();
     });
 
     function saveData() {
         database.setItem(this.id, this.value);
         if(this.id === 'videoIdInput' || this.id === 'domainInput') {
-            forcePlayerReset();
+            updateFramesUrls();
         }
     }
 
@@ -259,41 +259,14 @@
         logBox.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
     }
 
-    // Cette fonction est appelée automatiquement par le script de sécurité YouTube
-    function onYouTubeIframeAPIReady() {
-        forcePlayerReset();
-    }
-
-    function forcePlayerReset() {
+    function updateFramesUrls() {
         const videoId = document.getElementById('videoIdInput').value.trim();
         const domain = document.getElementById('domainInput').value.trim();
-
-        // Réinitialisation matérielle propre du lecteur via l'API officielle
-        if(ytPlayerNode) {
-            try { ytPlayerNode.destroy(); } catch(e) {}
-        }
-
-        ytPlayerNode = new YT.Player('player', {
-            height: '100%',
-            width: '100%',
-            videoId: videoId,
-            playerVars: {
-                'autoplay': 1,
-                'loop': 1,
-                'playlist': videoId,
-                'mute': 1,
-                'playsinline': 1 // Obligatoire pour forcer l'affichage interne sur les applications mobiles / APK
-            },
-            events: {
-                'onReady': (event) => {
-                    event.target.playVideo();
-                    log("✅ Lecteur officiel YouTube réveillé et connecté.");
-                }
-            }
-        });
-
-        // Mise à jour de l'adresse du chat
+        
+        // Retour à l'intégration iframe simple avec option playsinline=1 pour forcer l'affichage sur mobile
+        document.getElementById('ytPlayer').src = `https://youtube.com{videoId}?autoplay=1&loop=1&playlist=${videoId}&mute=1&playsinline=1`;
         document.getElementById('ytChat').src = `https://youtube.com{videoId}&embed_domain=${domain}`;
+        log("🔄 Lecteurs synchronisés.");
     }
 
     function handleAuthClick() {
