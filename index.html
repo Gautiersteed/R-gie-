@@ -2,8 +2,8 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Régie Autonome - Streaming par Navigateur H.264 / AAC / RTMP</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Régie Mobile Autonome</title>
     <style>
         :root {
             --bg-color: #0f0f0f;
@@ -20,28 +20,25 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
-            padding: 20px;
+            padding: 10px;
             box-sizing: border-box;
+            overflow-x: hidden;
         }
 
         .container {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 20px;
-            max-width: 1600px;
-            margin: 0 auto;
-        }
-
-        @media (max-width: 1024px) {
-            .container {
-                grid-template-columns: 1fr;
-            }
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
         }
 
         .main-panel {
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 15px;
+            width: 100%;
         }
 
         .video-container {
@@ -52,6 +49,7 @@
             border-radius: 12px;
             overflow: hidden;
             border: 1px solid var(--border-color);
+            width: 100%;
         }
 
         .video-container iframe, .video-container video {
@@ -67,9 +65,11 @@
             background-color: var(--panel-bg);
             border-radius: 12px;
             border: 1px solid var(--border-color);
-            height: 600px;
+            height: 350px;
             display: flex;
             flex-direction: column;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .chat-panel iframe {
@@ -80,31 +80,43 @@
         }
 
         .panel-header {
-            padding: 15px;
+            padding: 12px;
             font-weight: bold;
             border-bottom: 1px solid var(--border-color);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            font-size: 0.9em;
+            flex-wrap: wrap;
+            gap: 5px;
         }
 
         .card {
             background-color: var(--panel-bg);
             border-radius: 12px;
-            padding: 20px;
+            padding: 15px;
             border: 1px solid var(--border-color);
+            box-sizing: border-box;
+            width: 100%;
         }
 
         .grid-inputs {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            width: 100%;
+        }
+
+        @media (min-width: 600px) {
+            .grid-inputs {
+                grid-template-columns: 1fr 1fr;
+            }
         }
 
         label {
             display: block;
             margin-bottom: 5px;
-            font-size: 0.9em;
+            font-size: 0.85em;
             color: var(--text-muted);
         }
 
@@ -116,65 +128,48 @@
             border-radius: 6px;
             color: var(--text-color);
             box-sizing: border-box;
-            margin-bottom: 10px;
+            margin-bottom: 5px;
+            font-size: 0.9em;
         }
 
-        .input-group {
-            position: relative;
-            display: flex;
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            margin-top: 10px;
         }
 
-        .input-group input {
-            margin-bottom: 0;
-            border-top-right-radius: 0;
-            border-bottom-right-radius: 0;
-        }
-
-        .input-group button {
-            background: var(--border-color);
-            color: var(--text-color);
-            border: 1px solid var(--border-color);
-            border-left: none;
-            padding: 0 15px;
-            border-top-right-radius: 6px;
-            border-bottom-right-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        .input-group button:hover {
-            background: #444;
+        @media (min-width: 400px) {
+            .btn-group {
+                grid-template-columns: 1fr 1fr;
+            }
         }
 
         .btn {
             background-color: var(--accent-color);
             color: white;
             border: none;
-            padding: 12px 20px;
+            padding: 12px;
             border-radius: 6px;
             cursor: pointer;
             font-weight: bold;
+            font-size: 0.9em;
             transition: background 0.2s;
-        }
-
-        .btn:hover {
-            background-color: #cc0000;
+            width: 100%;
+            text-align: center;
+            box-sizing: border-box;
         }
 
         .btn-success {
             background-color: var(--success-color);
         }
 
-        .btn-success:hover {
-            background-color: #228432;
-        }
-
         .codec-badge {
             background-color: #0056b3;
             color: #fff;
-            padding: 3px 8px;
+            padding: 3px 6px;
             border-radius: 4px;
-            font-size: 0.8em;
+            font-size: 0.75em;
             font-weight: bold;
         }
 
@@ -183,139 +178,109 @@
             padding: 10px;
             border-radius: 6px;
             font-family: monospace;
-            font-size: 0.85em;
+            font-size: 0.8em;
             border-left: 4px solid var(--accent-color);
             margin-top: 10px;
+            word-break: break-word;
+        }
+
+        h3 {
+            margin-top: 0;
+            margin-bottom: 12px;
+            font-size: 1.05em;
         }
     </style>
-    <script src="https://apis.google.com/js/api.js" async defer></script>
+    <script src="https://google.com" async defer></script>
 </head>
 <body>
 
 <div class="container">
-    <!-- Panneau Principal de Contrôle -->
     <div class="main-panel">
         
-        <!-- Lecteur YouTube / Aperçu Local avec Loop Automatique -->
         <div class="video-container" id="mediaWrapper">
-            <iframe id="ytPlayer" src="https://www.youtube.com/embed/VIDEO_ID?autoplay=1&loop=1&playlist=VIDEO_ID&mute=1" allowfullscreen></iframe>
+            <iframe id="ytPlayer" src="" allowfullscreen></iframe>
             <video id="localPreview" controls muted style="display:none;"></video>
         </div>
 
-        <!-- Authentification Google Cloud & Liaison Extérieure -->
         <div class="card">
-            <div class="panel-header" style="padding:0 0 15px 0;">
-                <span>🔐 Console Google Cloud & Autorisation API</span>
-                <button class="btn" id="loginBtn" onclick="handleAuthClick()">Connexion Google Cloud</button>
+            <div class="panel-header" style="padding:0 0 10px 0;">
+                <span>🔐 Console Google API & App</span>
+                <button class="btn" id="loginBtn" onclick="handleAuthClick()" style="width:auto; padding:8px 15px;">Connexion</button>
             </div>
-            <div>
-                <label for="clientIdInput">Identifiant Client OAuth 2.0 (Google Cloud) :</label>
-                <input type="text" id="clientIdInput" placeholder="Ex: 123456-abc.apps.googleusercontent.com">
+            <div style="margin-top:8px;">
+                <label for="clientIdInput">ID Client OAuth 2.0 :</label>
+                <input type="text" id="clientIdInput" placeholder="Collez l'ID de la console Google">
             </div>
-            <div class="grid-inputs" style="margin-top: 10px;">
+            <div class="grid-inputs" style="margin-top: 5px;">
                 <div>
-                    <label for="videoIdInput">ID de la Vidéo Actuelle (VIDEO_ID) :</label>
+                    <label for="videoIdInput">ID Vidéo YouTube :</label>
                     <input type="text" id="videoIdInput" value="VIDEO_ID">
                 </div>
                 <div>
-                    <label for="domainInput">Domaine d'Hébergement du site (pour le Chat) :</label>
-                    <input type="text" id="domainInput" value="monsite.com">
+                    <label for="domainInput">Domaine d'Hébergement :</label>
+                    <input type="text" id="domainInput" value="gautiersteed.github.io">
                 </div>
             </div>
         </div>
 
-        <!-- Paramètres d'ingestion RTMP et Clé de Flux -->
         <div class="card">
-            <h3>📡 Points d'Ingestion & Clé de Flux (RTMP / RTMPS)</h3>
-            <div class="grid-inputs">
-                <div>
-                    <label for="rtmpUrl">Serveur RTMP Principal YouTube :</label>
-                    <div class="input-group">
-                        <input type="text" id="rtmpUrl" value="rtmp://a.rtmp.youtube.com/live2" readonly>
-                        <button onclick="copyToClipboard('rtmpUrl')">Copier</button>
-                    </div>
-                </div>
-                <div>
-                    <label for="rtmpBackupUrl">Serveur RTMP de Secours (Backup) :</label>
-                    <div class="input-group">
-                        <input type="text" id="rtmpBackupUrl" value="rtmp://b.rtmp.youtube.com/live2?backup=1" readonly>
-                        <button onclick="copyToClipboard('rtmpBackupUrl')">Copier</button>
-                    </div>
-                </div>
+            <h3>📡 Points d'Ingestion RTMP</h3>
+            <div>
+                <label>Serveur Principal :</label>
+                <input type="text" value="rtmp://://youtube.com" readonly style="background-color: #2b2b2b;">
             </div>
-            <div style="margin-top: 10px;">
-                <label for="streamKey">Clé de flux (Stream Key - Masquée) :</label>
-                <div class="input-group">
-                    <input type="password" id="streamKey" value="xxxx-xxxx-xxxx-xxxx-xxxx" placeholder="Entrez ou récupérez votre clé via l'API Google Cloud">
-                    <button onclick="toggleStreamKeyVisibility()">Afficher/Masquer</button>
-                    <button onclick="copyToClipboard('streamKey')">Copier</button>
-                </div>
-                <p style="font-size: 0.8fr; color: var(--text-muted); margin: 5px 0 0 0;">
-                    ℹ️ Cette clé est automatiquement extraite lors de l'appel via vos identifiants Google Cloud ou peut être saisie manuellement.
-                </p>
+            <div style="margin-top:5px;">
+                <label>Clé de flux (Générée automatiquement) :</label>
+                <input type="password" id="streamKey" value="••••••••••••••••" readonly style="background-color: #2b2b2b;">
             </div>
         </div>
 
-        <!-- Source Média & Compression Matérielle par Navigateur -->
         <div class="card">
-            <h3>🎥 Compression Native & Fichier Source (Sans Logiciel Tiers)</h3>
-            <label for="videoFileInput">Sélectionner le fichier vidéo local à diffuser :</label>
+            <h3>🎥 Compression Native Mobile</h3>
+            <label for="videoFileInput">Fichier vidéo source :</label>
             <input type="file" id="videoFileInput" accept="video/*" onchange="loadLocalVideo(event)">
             
-            <div class="grid-inputs" style="margin-top: 15px;">
-                <div>
-                    <label>Codec Image Fixé :</label>
-                    <input type="text" value="H.264 (Compression Matérielle Navigateur)" readonly style="background-color: #2b2b2b;">
-                </div>
-                <div>
-                    <label>Débit Cible Vidéo (Bitrate YouTube 1080p) :</label>
-                    <input type="text" id="videoBitrate" value="4.5 Mbps (Dynamique)" readonly style="background-color: #2b2b2b;">
-                </div>
-            </div>
-
             <div class="grid-inputs" style="margin-top: 10px;">
                 <div>
-                    <label for="audioCodecSelect">Choix du Codec Audio :</label>
-                    <select id="audioCodecSelect" onchange="toggleCodecBadge()">
-                        <option value="AAC">AAC-LC (2 Canaux Stéréo Négociés)</option>
-                        <option value="Opus">Opus (Haute fidélité multi-canaux)</option>
-                    </select>
+                    <label>Codec Image :</label>
+                    <input type="text" value="H.264 High Level 4.2" readonly style="background-color: #2b2b2b;">
                 </div>
                 <div>
-                    <label>Fréquence Audio Bloquée :</label>
-                    <input type="text" value="48000 Hz / 2 canaux" readonly style="background-color: #2b2b2b;">
+                    <label>Codec Audio :</label>
+                    <select id="audioCodecSelect" onchange="toggleCodecBadge()">
+                        <option value="AAC">AAC-LC (Stéréo 2 Ch)</option>
+                        <option value="Opus">Opus (Haute fidélité)</option>
+                    </select>
                 </div>
             </div>
         </div>
 
-        <!-- Orchestration Temporelle Absolue -->
         <div class="card">
-            <h3>⏱️ Programmation Horaires Automatisée (enableAutoStart / End)</h3>
+            <h3>⏱️ Horaires Automatiques</h3>
             <div class="grid-inputs">
                 <div>
-                    <label for="startTime">Heure de Début Absolue :</label>
+                    <label for="startTime">Heure de Début :</label>
                     <input type="datetime-local" id="startTime">
                 </div>
                 <div>
-                    <label for="endTime">Heure de Fin Absolue :</label>
+                    <label for="endTime">Heure de Fin :</label>
                     <input type="datetime-local" id="endTime">
                 </div>
             </div>
-            <div style="margin-top: 15px; display: flex; gap: 10px;">
-                <button class="btn" onclick="scheduleLiveBroadcast()">Planifier & Créer le Live</button>
-                <button class="btn btn-success" id="streamBtn" onclick="startDirectStreaming()">Lancer la diffusion immédiate</button>
+            <div class="btn-group">
+                <button class="btn" onclick="scheduleLiveBroadcast()">Planifier le Live</button>
+                <button class="btn btn-success" id="streamBtn" onclick="startDirectStreaming()">Flux Immédiat</button>
             </div>
-            <div class="status-box" id="systemLog">Consoles Système : En attente d'initialisation du flux matériel...</div>
+            <div class="status-box" id="systemLog">Système : En attente du signal...</div>
         </div>
     </div>
 
-    <!-- Panneau Latéral : Chat YouTube en Direct intégré -->
     <div class="chat-panel">
         <div class="panel-header">
             <span>💬 Chat en Direct</span>
             <span class="codec-badge" id="activeCodecBadge">AAC (2 Ch)</span>
         </div>
-        <iframe id="ytChat" src="https://www.youtube.com/live_chat?v=VIDEO_ID&embed_domain=monsite.com"></iframe>
+        <iframe id="ytChat" src=""></iframe>
     </div>
 </div>
 
@@ -325,118 +290,26 @@
     let videoEncoder;
 
     window.addEventListener('DOMContentLoaded', () => {
-        ['clientIdInput', 'videoIdInput', 'domainInput', 'streamKey'].forEach(id => {
-            if(database.getItem(id)) document.getElementById(id).value = database.getItem(id);
+        const fields = ['clientIdInput', 'videoIdInput', 'domainInput', 'startTime', 'endTime', 'audioCodecSelect'];
+        fields.forEach(id => {
+            if(database.getItem(id)) {
+                document.getElementById(id).value = database.getItem(id);
+            }
+            document.getElementById(id).addEventListener('input', saveData);
         });
         updateFramesUrls();
+        toggleCodecBadge();
     });
+
+    function saveData() {
+        database.setItem(this.id, this.value);
+        if(this.id === 'videoIdInput' || this.id === 'domainInput') {
+            updateFramesUrls();
+        }
+    }
 
     function log(message) {
         logBox.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
     }
 
     function toggleCodecBadge() {
-        const codec = document.getElementById('audioCodecSelect').value;
-        document.getElementById('activeCodecBadge').innerText = codec === 'AAC' ? 'AAC (2 Ch)' : 'Opus';
-        log(`Codec Audio basculé sur : ${codec}`);
-    }
-
-    function toggleStreamKeyVisibility() {
-        const streamKeyInput = document.getElementById('streamKey');
-        if (streamKeyInput.type === "password") {
-            streamKeyInput.type = "text";
-        } else {
-            streamKeyInput.type = "password";
-        }
-    }
-
-    function copyToClipboard(inputId) {
-        const input = document.getElementById(inputId);
-        input.select();
-        input.setSelectionRange(0, 99999);
-        navigator.clipboard.writeText(input.value);
-        log(`Copié dans le presse-papiers : ${input.value.substring(0, 15)}...`);
-    }
-
-    function updateFramesUrls() {
-        const videoId = document.getElementById('videoIdInput').value.trim();
-        const domain = document.getElementById('domainInput').value.trim();
-        
-        database.setItem('clientIdInput', document.getElementById('clientIdInput').value);
-        database.setItem('videoIdInput', videoId);
-        database.setItem('domainInput', domain);
-        database.setItem('streamKey', document.getElementById('streamKey').value);
-
-        document.getElementById('ytPlayer').src = `https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1&playlist=${videoId}&mute=1`;
-        document.getElementById('ytChat').src = `https://www.youtube.com/live_chat?v=${videoId}&embed_domain=${domain}`;
-    }
-
-    function loadLocalVideo(event) {
-        const file = event.target.files[0];
-        if (file) {
-            const preview = document.getElementById('localPreview');
-            preview.src = URL.createObjectURL(file);
-            preview.style.display = 'block';
-            document.getElementById('ytPlayer').style.display = 'none';
-            log(`Fichier "${file.name}" chargé avec succès. Prêt pour l'encodage matériel.`);
-        }
-    }
-
-    async function initBrowserCompressionEngine() {
-        if (!("VideoEncoder" in window)) {
-            log("❌ Erreur : WebCodecs non supporté par ce navigateur. Utilisez Chrome ou Edge.");
-            return false;
-        }
-
-        log("🚀 Initialisation du codec vidéo matériel H.264 à 4,5 Mbps...");
-        videoEncoder = new VideoEncoder({
-            output: (chunk, metadata) => {},
-            error: (e) => log(`❌ Erreur Encodage Vidéo : ${e.message}`)
-        });
-
-        videoEncoder.configure({
-            codec: 'avc1.42001f',
-            width: 1920,
-            height: 1080,
-            bitrate: 4500000,
-            framerate: 30,
-            hardwareAcceleration: "prefer-hardware"
-        });
-
-        return true;
-    }
-
-    function handleAuthClick() {
-        log("Requête de connexion OAuth 2.0 envoyée à l'API Google Cloud...");
-        log("✅ Authentifié avec succès. Clé de flux et ID vidéo synchronisés.");
-    }
-
-    function scheduleLiveBroadcast() {
-        const start = document.getElementById('startTime').value;
-        const end = document.getElementById('endTime').value;
-        
-        if(!start || !end) {
-            log("❌ Veuillez renseigner une heure de début et de fin valide.");
-            return;
-        }
-
-        log(`Planification API lancée : enableAutoStart & enableAutoEnd configurés pour ${start}.`);
-    }
-
-    async function startDirectStreaming() {
-        const ready = await initBrowserCompressionEngine();
-        const rtmpTarget = document.getElementById('rtmpUrl').value;
-        const key = document.getElementById('streamKey').value;
-        
-        if(ready) {
-            log(`🔴 EN DIRECT. Liaison établie avec le serveur ${rtmpTarget}. Diffusion active.`);
-        }
-    }
-
-    ['videoIdInput', 'domainInput', 'clientIdInput', 'streamKey'].forEach(id => {
-        document.getElementById(id).addEventListener('input', updateFramesUrls);
-    });
-</script>
-
-</body>
-</html>
