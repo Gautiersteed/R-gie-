@@ -342,6 +342,27 @@
     background:rgba(22,163,74,.1);color:var(--ok);border:1px solid rgba(22,163,74,.25);margin-left:6px}
   .regie-badge.off{background:#f1f5f9;color:var(--dim);border-color:var(--line)}
   button.primary:disabled,button.ghost:disabled{opacity:.45;cursor:not-allowed}
+
+  /* ---------- Relance automatique ---------- */
+  .auto-banner{
+    position:fixed; left:0; right:0; bottom:calc(62px + env(safe-area-inset-bottom)); z-index:50;
+    display:none; justify-content:center; pointer-events:none; padding:0 12px;
+  }
+  .auto-banner.show{display:flex}
+  .auto-inner{
+    pointer-events:auto; display:flex; align-items:center; gap:10px;
+    background:#ffffff; border:1px solid var(--line2); border-left:4px solid var(--warn);
+    border-radius:12px; padding:10px 12px; box-shadow:0 8px 26px rgba(15,23,42,.16);
+    max-width:520px; width:100%;
+  }
+  .auto-inner svg{width:20px;height:20px;flex:0 0 auto;stroke:var(--warn);fill:none;stroke-width:1.8}
+  .auto-txt{flex:1;min-width:0;font-size:12px;line-height:1.4;color:var(--txt)}
+  .auto-txt b{font-variant-numeric:tabular-nums;color:#b45309}
+  .auto-inner button{
+    flex:0 0 auto;font:inherit;font-size:11.5px;font-weight:800;padding:8px 11px;border-radius:9px;
+    border:1px solid var(--line2);background:#fff;color:var(--err);cursor:pointer
+  }
+  .auto-card-off{opacity:.55}
   .kv{display:flex;justify-content:space-between;font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--line)}
   .kv:last-child{border-bottom:0}
   .kv span:first-child{color:var(--dim)}
@@ -612,6 +633,29 @@
       </div>
     </div>
 
+
+    <div class="card" id="cardAuto">
+      <h2>Relance automatique</h2>
+      <div class="field">
+        <label class="switch"><input type="checkbox" id="autoEnabled" checked> Relancer la diffusion quand elle s'arrête</label>
+        <div class="hint">Après chaque fin de diffusion, l'encodeur attend puis <b>relance tout seul</b>, en boucle,
+          jusqu'à ce que tu cliques sur <b>Tout arrêter</b>.</div>
+      </div>
+      <div class="field">
+        <label for="autoDelay">Délai avant relance</label>
+        <select id="autoDelay">
+          <option value="30">30 secondes</option>
+          <option value="60">1 minute</option>
+          <option value="120" selected>2 minutes</option>
+          <option value="300">5 minutes</option>
+          <option value="600">10 minutes</option>
+        </select>
+      </div>
+      <div class="kv"><span>Relances enchaînées</span><span id="autoCount">0</span></div>
+      <div class="kv"><span>Prochaine relance</span><span id="autoNext">—</span></div>
+      <div class="hint" style="margin-top:8px">Un arrêt manuel ou une heure de fin programmée mettent fin à la boucle.</div>
+    </div>
+
     <div class="card">
       <h2>Réglages de diffusion</h2>
       <div class="field">
@@ -738,6 +782,26 @@
         </div>
         <div class="hint" id="linkHint">Le serveur télécharge la vidéo (yt-dlp) puis la garde en local.</div>
       </div>
+    </div>
+
+
+    <div class="card" id="cardAutoClips">
+      <h2>Relance automatique</h2>
+      <div class="field">
+        <label class="switch"><input type="checkbox" id="autoEnabled2" checked> Relancer le clip quand il se termine</label>
+        <div class="hint">Enchaîne les diffusions en boucle, avec le délai ci-dessous, jusqu'à <b>Tout arrêter</b>.</div>
+      </div>
+      <div class="field">
+        <label for="autoDelay2">Délai avant relance</label>
+        <select id="autoDelay2">
+          <option value="30">30 secondes</option>
+          <option value="60">1 minute</option>
+          <option value="120" selected>2 minutes</option>
+          <option value="300">5 minutes</option>
+          <option value="600">10 minutes</option>
+        </select>
+      </div>
+      <div class="kv"><span>Prochaine relance</span><span id="autoNext2">—</span></div>
     </div>
 
     <div class="card">
@@ -987,6 +1051,14 @@
   </div>
 </div>
 
+
+<div class="auto-banner" id="autoBanner">
+  <div class="auto-inner">
+    <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+    <div class="auto-txt" id="autoTxt">Relance dans <b>2:00</b></div>
+    <button id="autoStopNow">Tout arrêter</button>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1163,6 +1235,7 @@ function startHttpMode() {
       if (st.stats) { state.stats = st.stats; renderStats(); }
       refreshNowPlaying(s2);
       refreshScheduleInfo(s2);
+      syncAutoFromState(s2);
       // Aligne l'état local du bouton caméra sur l'état serveur
       if (s2.live && s2.mode === 'camera' && !state.recording) { /* géré par l'UI */ }
     } catch {
@@ -1983,6 +2056,7 @@ function addLink() {
 let npTimer = null;
 function refreshNowPlaying(liveState) {
   clipsState.live = liveState;
+  if (typeof syncAutoFromState === 'function') syncAutoFromState(liveState);
   const box = $('nowPlaying');
   if (!liveState || !liveState.live) {
     box.classList.remove('show');
@@ -2925,6 +2999,125 @@ function sendRatioToClipStart() {
   return currentRatio(true);
 }
 
+
+/* ================================================================== */
+/* RELANCE AUTOMATIQUE (boucle jusqu'à « Tout arrêter »)              */
+/* ================================================================== */
+const autoState = { enabled: true, delaySec: 120, restartAt: null, attempts: 0, tick: null };
+
+function wireAutoRestart() {
+  const pairs = [['autoEnabled', 'autoDelay'], ['autoEnabled2', 'autoDelay2']];
+  const push = async (enabled, delaySec) => {
+    // On synchronise les deux cartes (Direct et Clips)
+    $('autoEnabled').checked = enabled;
+    $('autoEnabled2').checked = enabled;
+    $('autoDelay').value = String(delaySec);
+    $('autoDelay2').value = String(delaySec);
+    try {
+      const r = await fetch('/api/live/autorestart', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled, delaySec }),
+      });
+      const d = await r.json();
+      if (d.auto) Object.assign(autoState, d.auto);
+      log(`Relance automatique ${enabled ? 'activée' : 'désactivée'} · délai ${fmtDelay(delaySec)}`,
+        enabled ? 'info' : 'warn');
+    } catch { toast('Réglage impossible (serveur injoignable)'); }
+    renderAuto();
+  };
+
+  for (const [chkId, selId] of pairs) {
+    const chk = $(chkId);
+    const sel = $(selId);
+    if (!chk || !sel) continue;
+    chk.addEventListener('change', () => push(chk.checked, Number(sel.value) || 120));
+    sel.addEventListener('change', () => push($('autoEnabled').checked, Number(sel.value) || 120));
+  }
+
+  $('autoStopNow').addEventListener('click', async () => {
+    if (!confirm('Arrêter la diffusion et désactiver la relance automatique ?')) return;
+    try {
+      await fetch('/api/live/stop', { method: 'POST' });
+      await fetch('/api/live/autorestart', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: false }),
+      });
+    } catch {}
+    // L'arrêt côté serveur coupe déjà la relance ; on reflète l'état
+    $('autoEnabled').checked = false;
+    $('autoEnabled2').checked = false;
+    toast('Diffusion arrêtée — relance désactivée');
+    log('Arrêt définitif demandé : relance automatique coupée.', 'warn');
+  });
+
+  // Délai par défaut demandé : 2 minutes
+  push(true, 120);
+  autoState.tick = setInterval(renderAuto, 1000);
+}
+
+function fmtDelay(sec) {
+  sec = Math.round(sec || 0);
+  if (sec < 60) return sec + ' s';
+  const m = Math.floor(sec / 60), r = sec % 60;
+  return m + ' min' + (r ? ' ' + r + ' s' : '');
+}
+
+function fmtClock(sec) {
+  sec = Math.max(0, Math.round(sec || 0));
+  const m = Math.floor(sec / 60), r = sec % 60;
+  return m + ':' + String(r).padStart(2, '0');
+}
+
+function renderAuto() {
+  const s = autoState;
+  const banner = $('autoBanner');
+  const liveNow = typeof clipsState !== 'undefined' && clipsState.live ? clipsState.live : null;
+
+  // Compte à rebours
+  if (s.restartAt) {
+    const left = Math.max(0, Math.round((s.restartAt - Date.now()) / 1000));
+    if (banner) {
+      banner.classList.add('show');
+      $('autoTxt').innerHTML = `Relance dans <b>${fmtClock(left)}</b>`
+        + (s.attempts ? ` · relance n°${s.attempts + 1}` : '');
+    }
+    const next = $('autoNext');
+    if (next) next.textContent = fmtClock(left);
+    const next2 = $('autoNext2');
+    if (next2) next2.textContent = fmtClock(left);
+    const c = $('autoCount');
+    if (c) c.textContent = String(s.attempts || 0);
+  } else {
+    if (banner) banner.classList.remove('show');
+    const next = $('autoNext');
+    if (next) next.textContent = s.enabled ? 'en attente' : 'désactivée';
+    const next2 = $('autoNext2');
+    if (next2) next2.textContent = s.enabled ? 'en attente' : 'désactivée';
+    const c = $('autoCount');
+    if (c) c.textContent = String(s.attempts || 0);
+  }
+
+  // État visuel des cartes
+  for (const id of ['cardAuto', 'cardAutoClips']) {
+    const el = $(id);
+    if (el) el.classList.toggle('auto-card-off', !s.enabled);
+  }
+}
+
+/* Mise à jour depuis l'état serveur */
+function syncAutoFromState(state) {
+  if (!state || !state.auto) return;
+  autoState.enabled = state.auto.enabled;
+  autoState.delaySec = state.auto.delaySec;
+  autoState.restartAt = state.auto.restartAt;
+  autoState.attempts = state.auto.attempts || 0;
+  if ($('autoEnabled')) $('autoEnabled').checked = state.auto.enabled;
+  if ($('autoEnabled2')) $('autoEnabled2').checked = state.auto.enabled;
+  if ($('autoDelay')) $('autoDelay').value = String(state.auto.delaySec);
+  if ($('autoDelay2')) $('autoDelay2').value = String(state.auto.delaySec);
+  renderAuto();
+}
+
 /* ------------------------------------------------------------------ */
 /* Commande FFmpeg (onglet Réglages)                                  */
 /* ------------------------------------------------------------------ */
@@ -3013,6 +3206,7 @@ renderCommand();
 setupScheduling();
 renderErrors();
 applyRatio();
+wireAutoRestart();
 initRegie();
 
 /* ---- Clips : câblage ---- */
@@ -3099,5 +3293,5 @@ $('permLater').addEventListener('click', () => {
 });
 $('permModal').addEventListener('click', (e) => { if (e.target.id === 'permModal') hidePermModal(); });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a55b6d7e2b596fc9',t:'MTc5Mzg3NzE5MQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a55b6d7e2b596fc9',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
