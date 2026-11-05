@@ -808,6 +808,17 @@
         </div>
         <div class="hint" id="linkHint">Le serveur télécharge la vidéo (yt-dlp) puis la garde en local.</div>
       </div>
+      <div class="field" style="margin-top:12px">
+        <label for="adoptInput">…ou un fichier déjà sur le serveur</label>
+        <div class="keyrow">
+          <input type="text" id="adoptInput" placeholder="data/clips/ma-video-11h.mp4" autocomplete="off" spellcheck="false">
+          <button class="iconbtn" id="btnAdopt" aria-label="Enregistrer le fichier">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+        <div class="hint" id="adoptHint">Pour les grosses vidéos (11 h ≈ 13 Go) : transfère le fichier en
+          <b>rsync</b> ou <b>scp</b> puis indique son chemin ici. Rien n'est ré-encodé s'il est déjà en H.264/AAC.</div>
+      </div>
     </div>
 
 
@@ -3309,6 +3320,26 @@ initRegie();
 $('drop').addEventListener('click', () => $('fileInput').click());
 $('fileInput').addEventListener('change', (e) => { uploadFiles(e.target.files); e.target.value = ''; });
 
+$('btnAdopt').addEventListener('click', async () => {
+  const file = ($('adoptInput').value || '').trim();
+  if (!file) { toast('Indique le chemin du fichier sur le serveur'); return; }
+  toast('Analyse du fichier…');
+  try {
+    const r = await fetch('/api/clips/adopt', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file }),
+    });
+    const d = await r.json();
+    if (d.error) { toast(d.error); return; }
+    $('adoptInput').value = '';
+    toast(d.directPlay
+      ? 'Enregistré · lecture directe, aucun ré-encodage'
+      : 'Enregistré · ré-encodage au premier lancement');
+    log(`Clip enregistré : « ${d.clip.title} » (${fmtTime(d.clip.duration)})`, 'ok');
+    loadClips();
+  } catch { toast('Serveur injoignable'); }
+});
+
 for (const evt of ['dragenter', 'dragover']) {
   $('drop').addEventListener(evt, (e) => { e.preventDefault(); $('drop').classList.add('over'); });
 }
@@ -3389,5 +3420,5 @@ $('permLater').addEventListener('click', () => {
 });
 $('permModal').addEventListener('click', (e) => { if (e.target.id === 'permModal') hidePermModal(); });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a55bd250fccf9eca',t:'MTc5Mzg4MTMyMQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a55bd250fccf9eca',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a55c02578b4286d9',t:'MTc5Mzg4MzI4OA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a55c02578b4286d9',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
