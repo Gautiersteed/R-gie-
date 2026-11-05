@@ -569,6 +569,14 @@
   <!-- ============================= ONGLET CLIPS ============================= -->
   <section class="page" id="page-clips">
 
+    <div class="banner" id="clipsOffline" style="display:none;background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.4);color:#fcd34d">
+      <div style="font-weight:700;margin-bottom:4px">Fonctions serveur indisponibles</div>
+      <div>Cette page est hébergée sans serveur d'encodage : <b>l'upload de fichiers, l'ajout par lien et la diffusion ne peuvent pas fonctionner ici</b>.
+        La bibliothèque reste visible, et l'onglet <b>Régie</b> reste pleinement utilisable.</div>
+      <div style="margin-top:8px;font-size:11.5px">Pour activer ces fonctions : lance <code>node server.js</code> sur ta machine, puis ouvre
+        <code>http://localhost:3000</code>.</div>
+    </div>
+
     <div class="autonomy">
       <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
       <div>
@@ -925,10 +933,47 @@ function toast(msg) {
 /* ------------------------------------------------------------------ */
 /* Transport : WebSocket si disponible, sinon repli HTTP (polling + POST).
    Certains proxys / réseaux d'entreprise bloquent les upgrades WebSocket. */
-const net = { mode: null, httpTimer: null, logCursor: 0, reconnectTimer: null, warned: false };
+const net = {
+  mode: null,          // 'ws' | 'http' | 'offline'
+  httpTimer: null,
+  logCursor: 0,
+  reconnectTimer: null,
+  warned: false,
+  attempts: 0,         // tentatives consécutives échouées
+  knownAbsent: false,  // aucun serveur détecté : on arrête d'insister
+};
 
 function isOnline() {
   return net.mode === 'ws' ? (state.ws && state.ws.readyState === WebSocket.OPEN) : net.mode === 'http';
+}
+
+/* Active ou désactive les fonctions qui exigent le serveur d'encodage. */
+function setClipsAvailable(available) {
+  const ids = ['drop', 'btnLink', 'linkInput', 'btnSchedule', 'fileInput'];
+  ids.forEach((id) => {
+    const el = $(id);
+    if (!el) return;
+    if (el.tagName === 'BUTTON' || el.tagName === 'INPUT') el.disabled = !available;
+    el.style.opacity = available ? '' : '.45';
+    el.style.pointerEvents = available ? '' : 'none';
+  });
+  const banner = $('clipsOffline');
+  if (banner) banner.style.display = available ? 'none' : 'block';
+  document.querySelectorAll('.clip-actions button').forEach((b) => {
+    if (['play', 'sched', 'preview'].includes(b.dataset.role)) {
+      b.disabled = !available && b.dataset.role !== 'preview';
+    }
+  });
+}
+
+/* Message unique quand la page tourne sans serveur (GitHub Pages, etc.) */
+let staticNotified = false;
+function notifyStaticHosting() {
+  if (staticNotified) return;
+  staticNotified = true;
+  setClipsAvailable(false);
+  log('Page hébergée sans serveur : upload, liens et diffusion sont désactivés ici. '
+    + 'La Régie (lecteur, chat, horaires) fonctionne normalement.', 'warn');
 }
 
 function showOffline(msg) {
@@ -972,6 +1017,7 @@ function sendChunk(buf) {
 /* ---- Repli HTTP : on interroge l'état et les journaux ---- */
 function startHttpMode() {
   if (net.mode === 'http') return;
+  notifyStaticHosting();
   net.mode = 'http';
   state.ws = null;
   setStatus('idle', 'Prêt');
@@ -1002,6 +1048,7 @@ function startHttpMode() {
         setStatus('off', 'Hors ligne');
         showOffline('Connexion au serveur perdue.');
         addError('réseau', 'Connexion au serveur perdue (HTTP)');
+        notifyStaticHosting();
       }
     }
   }, 1000);
@@ -1029,9 +1076,16 @@ function connect() {
 
   ws.onopen = () => {
     clearTimeout(openTimer);
+    if (net.knownAbsent || net.attempts > 0) {
+      log('Serveur d\'encodage reconnecté.', 'ok');
+      if (typeof setClipsAvailable === 'function') setClipsAvailable(true);
+    }
+    net.attempts = 0;
+    net.knownAbsent = false;
     net.mode = 'ws';
     clearInterval(net.httpTimer);
     hideOffline();
+    setClipsAvailable(true);
     setStatus('idle', 'Prêt');
     log("Connecté au serveur d'encodage.", 'ok');
   };
@@ -1039,12 +1093,32 @@ function connect() {
   ws.onclose = () => {
     clearTimeout(openTimer);
     if (net.mode === 'http') return; // déjà en repli
+
+    net.attempts++;
     setStatus('off', 'Hors ligne');
-    showOffline('Le serveur ne répond plus.');
-    addError('réseau', 'WebSocket fermé — serveur injoignable');
     if (state.recording) stopEverything('Serveur déconnecté');
     net.mode = null;
-    net.reconnectTimer = setTimeout(connect, 3000);
+
+    // Une seule entrée dans le journal, puis plus rien tant que l'état ne change pas.
+    if (net.attempts === 1) {
+      addError('réseau', 'Serveur d\'encodage injoignable (WebSocket)');
+    }
+
+    if (net.attempts >= 3 && !net.knownAbsent) {
+      // Aucun serveur : inutile de marteler. On passe en veille longue.
+      net.knownAbsent = true;
+      showOffline('Aucun serveur détecté à cette adresse.');
+      log('Aucun serveur d\'encodage détecté : nouvel essai toutes les 2 minutes. '
+        + 'La Régie reste pleinement utilisable.', 'warn');
+      notifyStaticHosting();
+    } else if (net.attempts >= 3) {
+      showOffline('Aucun serveur détecté à cette adresse.');
+    }
+
+    // Backoff : 5 s, 10 s, 20 s puis 120 s
+    const delay = net.knownAbsent ? 120000 : Math.min(20000, 5000 * Math.pow(2, net.attempts - 1));
+    clearTimeout(net.reconnectTimer);
+    net.reconnectTimer = setTimeout(connect, delay);
   };
 
   ws.onerror = () => {
@@ -1728,6 +1802,7 @@ function toggleSchedule(el, c) {
 
 /* ---------- Upload ---------- */
 function uploadFiles(files) {
+  if (!isOnline()) return toast('Upload impossible : le serveur d\'encodage n\'est pas lancé');
   const list = [...files].filter((f) => f.type.startsWith('video/') || /\.(mp4|mov|mkv|webm|m4v|avi)$/i.test(f.name));
   if (!list.length) return toast('Aucun fichier vidéo reconnu');
 
@@ -1763,6 +1838,7 @@ function uploadFiles(files) {
 
 /* ---------- Lien ---------- */
 function addLink() {
+  if (!isOnline()) return toast('Ajout par lien impossible : le serveur d\'encodage n\'est pas lancé');
   const url = $('linkInput').value.trim();
   if (!/^https?:\/\//i.test(url)) return toast('Colle un lien http(s) valide');
   if (!clipsState.ytdlp) return toast('yt-dlp absent sur le serveur');
@@ -1993,11 +2069,22 @@ try {
 } catch { errors = []; }
 console.log('[journal] entrées restaurées :', errors.length);
 
+/* Fenêtre anti-doublon par source (ms) : le réseau se répète en boucle
+   quand aucun serveur n'écoute, il ne doit pas noyer le journal. */
+const DEDUPE_WINDOW = { réseau: 30 * 60000, 'régie': 60000, défaut: 5000 };
+
 function addError(source, message, level = 'error') {
-  const entry = { t: Date.now(), source, message: String(message).slice(0, 400), level };
-  // Anti-doublon : même message dans les 5 dernières secondes
-  const dup = errors.find((e) => e.message === entry.message && entry.t - e.t < 5000);
-  if (dup) return;
+  const now = Date.now();
+  const win = DEDUPE_WINDOW[source] || DEDUPE_WINDOW.défaut;
+  const dup = errors.find((e) => e.source === source && e.message === String(message).slice(0, 400) && now - e.t < win);
+  if (dup) {
+    dup.count = (dup.count || 1) + 1;
+    dup.t = now;
+    try { localStorage.setItem(ERR_KEY, JSON.stringify(errors)); } catch {}
+    renderErrors();
+    return;
+  }
+  const entry = { t: now, source, message: String(message).slice(0, 400), level, count: 1 };
   errors.push(entry);
   if (errors.length > 60) errors = errors.slice(-60);
   try { localStorage.setItem(ERR_KEY, JSON.stringify(errors)); } catch {}
@@ -2020,8 +2107,9 @@ function renderErrors() {
     const d = document.createElement('div');
     d.className = 'err-item' + (e.level === 'warn' ? ' warn' : '');
     const hh = new Date(e.t).toLocaleTimeString('fr-FR', { hour12: false });
+    const n = e.count && e.count > 1 ? ` <b style="color:#fcd34d">×${e.count}</b>` : '';
     d.innerHTML = `<time>${hh}</time><span class="src">${escapeHtml(e.source)}</span>`
-      + `<span class="msg">${escapeHtml(e.message)}</span>`;
+      + `<span class="msg">${escapeHtml(e.message)}${n}</span>`;
     box.appendChild(d);
   });
 }
@@ -2383,12 +2471,32 @@ function initRegie() {
       return data;
     }
 
+    async function diagnoseId(id) {
+      // Deuxième vérification : est-ce une vidéo ordinaire ? Cela distingue
+      // « mauvais ID » de « mauvais compte » et évite un message trompeur.
+      try {
+        const v = await youtube('videos', { part: 'snippet,status', id });
+        const item = v.items && v.items[0];
+        if (item) {
+          return ' L\'ID ' + id + ' correspond à la vidéo « ' + item.snippet.title
+            + ' », qui n\'est pas un direct (liveBroadcast). Utilise l\'ID du direct créé dans Studio.';
+        }
+      } catch {}
+      return ' Aucune vidéo ni direct visible avec cet ID depuis ce compte : '
+        + 'soit l\'ID est erroné, soit tu n\'es pas connecté avec le compte propriétaire.';
+    }
+
     async function getBroadcast(id) {
       const data = await youtube('liveBroadcasts', { part: 'snippet,status', id });
       const broadcast = data.items && data.items[0];
       if (!broadcast) {
-        throw new Error('Aucun direct accessible avec cet ID. Vérifiez le compte propriétaire et l\'ID du direct '
-          + '(une vidéo ordinaire ne convient pas).');
+        const hint = await diagnoseId(id);
+        throw new Error('Cet ID n\'est pas un direct de ton compte.' + hint + ' Vérifie : '
+          + '1) tu es connecté avec le compte PROPRIÉTAIRE de la chaîne ; '
+          + '2) la vidéo a bien été créée comme DIRECT dans YouTube Studio (Créer → Passer au direct) — '
+          + 'l\'API ne renvoie que les lives, pas les vidéos classiques ; '
+          + '3) l\'ID est celui du direct, pas d\'une rediffusion. '
+          + 'Ouvre Studio → Gérer → Directs, clique sur ton direct et copie l\'URL (youtube.com/watch?v=… ou /live/…).');
       }
       return broadcast;
     }
