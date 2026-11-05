@@ -386,6 +386,100 @@
       </div>
     </div>
 
+
+    <div class="card">
+      <h2>Créer un direct <span class="regie-badge off" id="createBadge">Studio non requis</span></h2>
+      <p class="note" style="margin-top:0">Remplis tout ici : l'app crée le direct <b>et</b> le flux sur YouTube,
+        puis te donne la clé à coller dans l'encodeur. Plus besoin d'ouvrir YouTube Studio.</p>
+
+      <div class="field">
+        <label for="nbTitle">Titre</label>
+        <input id="nbTitle" type="text" maxlength="100" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="nbDesc">Description</label>
+        <input id="nbDesc" type="text" maxlength="200" spellcheck="false">
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="nbCategory">Catégorie</label>
+          <select id="nbCategory">
+            <option value="22">People &amp; Blogs</option>
+            <option value="24">Divertissement</option>
+            <option value="20" selected>Gaming</option>
+            <option value="10">Musique</option>
+            <option value="17">Sport</option>
+            <option value="28">Science &amp; Technologie</option>
+            <option value="27">Éducation</option>
+            <option value="25">Actualités &amp; Politique</option>
+            <option value="26">Howto &amp; Style</option>
+            <option value="23">Comédie</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="nbPrivacy">Confidentialité</label>
+          <select id="nbPrivacy">
+            <option value="public">Public</option>
+            <option value="unlisted">Non répertorié</option>
+            <option value="private">Privé</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="nbRatio">Format de l'image</label>
+        <select id="nbRatio">
+          <option value="16:9">16:9 — horizontal (1280×720)</option>
+          <option value="9:16">9:16 — vertical « Shorts / feed » (720×1280)</option>
+          <option value="1:1">1:1 — carré (720×720)</option>
+          <option value="4:5">4:5 — portrait feed (720×900)</option>
+        </select>
+        <div class="hint" id="nbRatioHint">Choisis <b>9:16</b> pour une diffusion verticale destinée au fil mobile.</div>
+      </div>
+
+      <div class="field">
+        <label class="switch"><input type="checkbox" id="nbKids"> Contenu destiné aux enfants</label>
+      </div>
+      <div class="field">
+        <label class="switch"><input type="checkbox" id="nbAuto" checked> Démarrage/arrêt automatiques du direct selon le flux</label>
+        <div class="hint">Auto-start : le direct passe en ligne dès que le flux arrive. Auto-stop : il se termine quand le flux s'arrête.</div>
+      </div>
+      <div class="field">
+        <label class="switch"><input type="checkbox" id="nbDvr" checked> Enregistrement (VOD) et rembobinage (DVR)</label>
+      </div>
+      <div class="field">
+        <label for="nbLatency">Latence</label>
+        <select id="nbLatency">
+          <option value="normal" selected>Normale (recommandée)</option>
+          <option value="low">Faible</option>
+          <option value="ultraLow">Très faible</option>
+        </select>
+        <div class="hint">« Très faible » augmente les risques de coupures : à réserver à une très bonne connexion.</div>
+      </div>
+      <div class="field">
+        <label for="nbStart">Début prévu</label>
+        <input type="datetime-local" id="nbStart">
+      </div>
+
+      <div class="actions" style="margin-bottom:0">
+        <button class="primary" id="btnCreateBroadcast">Créer le direct et obtenir la clé</button>
+      </div>
+
+      <div id="nbResult" style="display:none;margin-top:14px">
+        <div class="note" style="border-left:3px solid #22c55e;background:rgba(34,197,94,.07);padding:10px 12px;border-radius:0 8px 8px 0">
+          ✅ Direct créé. Colle la clé dans l'encodeur, ou utilise le bouton ci-dessous.
+        </div>
+        <div class="kv"><span>Serveur d'ingestion</span><span id="nbIngest" style="font-family:ui-monospace,monospace;font-size:11px">—</span></div>
+        <div class="kv"><span>Clé de flux</span><span id="nbStreamKey" style="font-family:ui-monospace,monospace;font-size:11px">—</span></div>
+        <div class="kv"><span>ID du direct</span><span id="nbVideoId" style="font-family:ui-monospace,monospace;font-size:11px">—</span></div>
+        <div class="actions" style="margin-top:11px;margin-bottom:0">
+          <button class="primary" id="btnUseKey">Utiliser dans l'encodeur</button>
+          <button class="ghost" id="btnCopyKey">Copier la clé</button>
+        </div>
+      </div>
+    </div>
+
     <div class="card">
       <h2>Horaires prévus du direct</h2>
       <div class="row">
@@ -511,6 +605,16 @@
     <div class="card">
       <h2>Réglages de diffusion</h2>
       <div class="field">
+        <label for="ratioSelect">Format de l'image</label>
+        <select id="ratioSelect">
+          <option value="16:9" selected>16:9 — horizontal (1280×720)</option>
+          <option value="9:16">9:16 — vertical « Shorts / feed » (720×1280)</option>
+          <option value="1:1">1:1 — carré (720×720)</option>
+          <option value="4:5">4:5 — portrait feed (720×900)</option>
+        </select>
+        <div class="hint" id="ratioHint">En vertical, l'image est <b>recadrée au centre</b> pour remplir le cadre.</div>
+      </div>
+      <div class="field">
         <label for="preset">Qualité</label>
         <select id="preset">
           <option value="1080p30">1080p · 30 i/s — 4500 kb/s</option>
@@ -605,6 +709,15 @@
       </div>
       <div class="prog" id="uploadProg"><i id="uploadBar"></i></div>
 
+      <div class="field">
+        <label for="clipsRatio">Format de diffusion</label>
+        <select id="clipsRatio">
+          <option value="16:9">16:9 — horizontal</option>
+          <option value="9:16">9:16 — vertical « Shorts / feed »</option>
+          <option value="1:1">1:1 — carré</option>
+          <option value="4:5">4:5 — portrait feed</option>
+        </select>
+      </div>
       <div class="field" style="margin-top:12px">
         <label for="linkInput">…ou coller un lien vidéo</label>
         <div class="keyrow">
@@ -1338,6 +1451,8 @@ async function start() {
     container: state.container,
     ingest: 'rtmp://a.rtmp.youtube.com/live2',
   };
+  startPayload.ratio = currentRatio(false);
+
   const endInfo = (typeof getCamEnd === 'function' ? getCamEnd() : { mode: 'none' });
   if (endInfo.mode === 'dur') startPayload.durationMin = endInfo.durationMin;
   if (endInfo.mode === 'until') startPayload.untilTs = endInfo.untilTs;
@@ -1682,7 +1797,7 @@ function startClipNow(id, el) {
   fetch('/api/live/start-clip', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      clipId: id, streamKey: key, preset, fps,
+      clipId: id, streamKey: key, preset, fps, ratio: currentRatio(true),
       height: { '1080p30': 1080, '720p30': 720, '720p60': 720, '480p30': 480, '360p30': 360 }[preset] || 720,
       mode: $('testMode').checked ? 'file' : 'youtube',
       ingest: 'rtmp://a.rtmp.youtube.com/live2',
@@ -1773,7 +1888,7 @@ function toggleSchedule(el, c) {
     if (!startAt || startAt < Date.now() - 60000) return toast('Choisis une heure de début valide');
 
     const body = {
-      clipId: c.id, streamKey: key,
+      clipId: c.id, streamKey: key, ratio: currentRatio(true),
       preset: $('preset').value, fps: Number($('fps').value),
       height: { '1080p30': 1080, '720p30': 720, '720p60': 720, '480p30': 480, '360p30': 360 }[$('preset').value] || 720,
       mode: $('testMode').checked ? 'file' : 'youtube',
@@ -2186,7 +2301,7 @@ function setupScheduling() {
     }
 
     const body = {
-      clipId, streamKey: getStreamKey(),
+      clipId, streamKey: getStreamKey(), ratio: currentRatio(true),
       preset: $('preset').value, fps: Number($('fps').value),
       height: { '1080p30': 1080, '720p30': 720, '720p60': 720, '480p30': 480, '360p30': 360 }[$('preset').value] || 720,
       mode: $('testMode').checked ? 'file' : 'youtube',
@@ -2585,6 +2700,8 @@ function initRegie() {
 
     refreshAuthUI();
     updateFramesUrls();
+    Object.assign(regieApi, { youtube, requireToken, getBroadcast, videoIdFrom, refreshAuthUI });
+    setTimeout(wireCreateBroadcast, 0);
 
     /* Chargement du module Google (une seule fois, à l'ouverture de l'onglet) */
     if (!document.getElementById('gsiClient')) {
@@ -2597,6 +2714,205 @@ function initRegie() {
       document.head.appendChild(g);
     }
   })();
+}
+
+
+/* API Régie exposée au reste de la page (les helpers OAuth vivent
+   dans une closure : on les publie ici pour la création de direct). */
+const regieApi = {};
+
+/* ================================================================== */
+/* CRÉATION D'UN DIRECT COMPLET DEPUIS L'APP                          */
+/* liveBroadcasts.insert + liveStreams.insert + liveBroadcasts.bind   */
+/* ================================================================== */
+let createdBroadcast = null;
+
+function wireCreateBroadcast() {
+  const startEl = $('nbStart');
+  if (!startEl) return;
+  if (!startEl.value) startEl.value = toLocalInput(new Date(Date.now() + 10 * 60000));
+
+  $('nbRatio').addEventListener('change', () => {
+    const hint = $('nbRatioHint');
+    const r = $('nbRatio').value;
+    hint.innerHTML = r === '9:16'
+      ? 'Vertical : l\'image est <b>recadrée au centre</b> pour remplir le cadre 720×1280.'
+      : r === '16:9'
+        ? 'Horizontal classique, le plus universel.'
+        : 'Format intermédiaire : recadrage centré également.';
+  });
+
+  $('btnCreateBroadcast').addEventListener('click', createBroadcastFromApp);
+
+  $('btnUseKey').addEventListener('click', () => {
+    if (!createdBroadcast) return;
+    $('streamKey').value = createdBroadcast.streamKey;
+    try { localStorage.setItem('yt_stream_key', createdBroadcast.streamKey); } catch {}
+    $('preset').value = '720p30';
+    const ratioSelect = $('ratioSelect');
+    if (ratioSelect) ratioSelect.value = createdBroadcast.ratio;
+    applyRatio();
+    document.querySelector('.tab[data-page="direct"]').click();
+    toast('Clé installée — clique sur « Démarrer le direct »');
+    log('Clé du direct créé installée dans l\'encodeur (' + createdBroadcast.ratio + ').', 'ok');
+  });
+
+  $('btnCopyKey').addEventListener('click', async () => {
+    if (!createdBroadcast) return;
+    try { await navigator.clipboard.writeText(createdBroadcast.streamKey); toast('Clé copiée'); }
+    catch { toast('Copie impossible'); }
+  });
+
+  $('videoIdInput').addEventListener('change', () => {});
+}
+
+async function createBroadcastFromApp() {
+  const btn = $('btnCreateBroadcast');
+  const title = $('nbTitle').value.trim();
+  if (!title) { $('nbTitle').focus(); return regieLog('❌ Donne un titre au direct.'); }
+
+  const startAt = new Date($('nbStart').value);
+  if (!Number.isFinite(startAt.getTime())) return regieLog('❌ Date de début invalide.');
+
+  btn.disabled = true;
+  btn.textContent = 'Création…';
+  try {
+    regieApi.requireToken();
+    const ratio = $('nbRatio').value;
+    regieLog('Création du direct « ' + title + ' »…');
+
+    /* 1. Le direct (métadonnées + statut + réglages de diffusion) */
+    const broadcastBody = {
+      snippet: {
+        title,
+        description: $('nbDesc').value.trim() || '',
+        scheduledStartTime: startAt.toISOString(),
+        categoryId: $('nbCategory').value,
+      },
+      status: {
+        privacyStatus: $('nbPrivacy').value,
+        selfDeclaredMadeForKids: $('nbKids').checked,
+      },
+      contentDetails: {
+        enableAutoStart: $('nbAuto').checked,
+        enableAutoStop: $('nbAuto').checked,
+        enableDvr: $('nbDvr').checked,
+        recordFromStart: $('nbDvr').checked,
+        enableEmbed: true,
+        latencyPreference: $('nbLatency').value,
+        // Pas de « monitor stream » : inutile et coûteux en bande passante
+        monitorStream: { enableMonitorStream: false },
+      },
+    };
+    const broadcast = await regieApi.youtube('liveBroadcasts',
+      { part: 'snippet,status,contentDetails' },
+      { method: 'POST', body: JSON.stringify(broadcastBody) });
+    regieLog('Direct créé : ' + broadcast.id);
+
+    /* 2. Le flux (clé d'ingestion) */
+    const streamBody = {
+      snippet: { title: title + ' — flux' },
+      cdn: {
+        frameRate: 'variable',
+        resolution: ratio === '9:16' || ratio === '4:5' ? 'variable' : 'variable',
+        ingestionType: 'rtmp',
+      },
+      contentDetails: { isReusable: false },
+    };
+    const stream = await regieApi.youtube('liveStreams',
+      { part: 'snippet,cdn,contentDetails' },
+      { method: 'POST', body: JSON.stringify(streamBody) });
+
+    const info = (stream.cdn && stream.cdn.ingestionInfo) || {};
+    const streamKey = info.streamName || '';
+    const ingest = info.ingestionAddress || 'rtmp://a.rtmp.youtube.com/live2';
+
+    /* 3. Liaison direct ↔ flux */
+    // ⚠️ bind est une opération POST (sans corps)
+    await regieApi.youtube('liveBroadcasts/bind',
+      { part: 'id,contentDetails', id: broadcast.id, streamId: stream.id },
+      { method: 'POST' });
+
+    createdBroadcast = { broadcastId: broadcast.id, streamId: stream.id, streamKey, ingest, ratio, title };
+
+    $('nbIngest').textContent = ingest;
+    $('nbStreamKey').textContent = streamKey ? streamKey.slice(0, 4) + '••••••••' + streamKey.slice(-4) : '—';
+    $('nbVideoId').textContent = broadcast.id;
+    $('nbResult').style.display = 'block';
+    $('createBadge').textContent = 'direct créé';
+    $('createBadge').classList.remove('off');
+
+    // Pré-remplit la Régie pour surveiller le direct qu'on vient de créer
+    $('videoIdInput').value = broadcast.id;
+    updateFramesUrlsFor(broadcast.id);
+
+    regieLog('✅ Direct prêt : « ' + title + ' »\nClé de flux générée et liée au direct.\n'
+      + 'Clique sur « Utiliser dans l\'encodeur » puis « Démarrer le direct ».');
+    log('Direct créé via l\'API (id ' + broadcast.id + '). Clé prête pour l\'encodeur.', 'ok');
+    toast('Direct créé — clé prête');
+  } catch (error) {
+    regieLog('❌ Création impossible : ' + (error.name === 'TimeoutError'
+      ? 'délai dépassé, réessaie.' : error.message));
+    if (/quota|forbidden|insufficient|liveStreamingNotEnabled/i.test(error.message)) {
+      regieLog('❌ Cause probable : la diffusion en direct n\'est pas encore activée sur la chaîne '
+        + '(24 h d\'attente après la première activation), ou l\'API YouTube Data v3 n\'est pas activée dans Google Cloud.');
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Créer le direct et obtenir la clé';
+  }
+}
+
+/* Charge le lecteur pour un ID donné (utilisé après création) */
+function updateFramesUrlsFor(id) {
+  try {
+    const player = new URL('https://www.youtube.com/embed/' + id);
+    player.search = new URLSearchParams({ autoplay: '1', mute: '1', playsinline: '1' }).toString();
+    const el = $('ytPlayer');
+    if (el) el.src = player.href;
+    const watch = $('watchLink');
+    if (watch) watch.href = 'https://www.youtube.com/watch?v=' + id;
+    const chat = new URL('https://www.youtube.com/live_chat');
+    chat.search = new URLSearchParams({ v: id, embed_domain: location.hostname, dark_theme: '1' }).toString();
+    const chatEl = $('ytChat');
+    if (chatEl) chatEl.src = chat.href;
+  } catch {}
+}
+
+
+/* ================================================================== */
+/* FORMAT D'IMAGE : aperçu + envoi au serveur                         */
+/* ================================================================== */
+const RATIO_CSS = { '16:9': '16 / 9', '9:16': '9 / 16', '1:1': '1 / 1', '4:5': '4 / 5' };
+
+function applyRatio() {
+  const ratio = ($('ratioSelect') && $('ratioSelect').value) || '16:9';
+  const box = $('previewBox');
+  if (box) {
+    box.style.aspectRatio = RATIO_CSS[ratio] || '16 / 9';
+    // En vertical, l'aperçu devient nettement plus haut : on limite la hauteur
+    box.style.maxHeight = ratio === '16:9' ? '' : '62vh';
+    box.style.margin = ratio === '16:9' ? '' : '0 auto 12px';
+    box.style.maxWidth = ratio === '16:9' ? '' : 'min(100%, 46vh)';
+  }
+  const hint = $('ratioHint');
+  if (hint) {
+    hint.innerHTML = ratio === '16:9'
+      ? 'Format horizontal classique.'
+      : ratio === '9:16'
+        ? 'Vertical plein écran : idéal pour apparaître dans le <b>fil mobile</b>. L\'image est recadrée au centre.'
+        : 'Recadrage centré dans le format choisi.';
+  }
+  if (state.stream && !state.recording) refreshPreview();
+}
+
+function currentRatio(forClips) {
+  const el = forClips ? $('clipsRatio') : $('ratioSelect');
+  return (el && el.value) || '16:9';
+}
+
+function sendRatioToClipStart() {
+  return currentRatio(true);
 }
 
 /* ------------------------------------------------------------------ */
@@ -2669,6 +2985,7 @@ $('preset').addEventListener('change', () => {
 });
 $('fps').addEventListener('change', () => { renderCommand(); refreshPreview(); });
 $('camera').addEventListener('change', refreshPreview);
+if ($('ratioSelect')) $('ratioSelect').addEventListener('change', applyRatio);
 $('mic').addEventListener('change', refreshPreview);
 
 // Restauration de la clé mémorisée
@@ -2685,6 +3002,7 @@ document.addEventListener('visibilitychange', () => {
 renderCommand();
 setupScheduling();
 renderErrors();
+applyRatio();
 initRegie();
 
 /* ---- Clips : câblage ---- */
@@ -2771,5 +3089,5 @@ $('permLater').addEventListener('click', () => {
 });
 $('permModal').addEventListener('click', (e) => { if (e.target.id === 'permModal') hidePermModal(); });
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a559c5c2e8b200d4',t:'MTc5Mzg1OTgzNQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a559c5c2e8b200d4',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
