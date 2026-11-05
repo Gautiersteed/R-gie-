@@ -478,6 +478,12 @@
       </div>
       <div class="field">
         <label class="switch"><input type="checkbox" id="nbDvr" checked> Enregistrement (VOD) et rembobinage (DVR)</label>
+        <div class="hint">À laisser coché : c'est ce qui crée le replay et fait compter les heures de visionnage.</div>
+      </div>
+      <div class="field">
+        <label class="switch"><input type="checkbox" id="nbReusable" checked> Clé de flux réutilisable</label>
+        <div class="hint">Indispensable pour les longues diffusions : à chaque reconnexion, YouTube ouvre un
+          <b>nouveau direct</b> (donc un nouvel enregistrement, avant la limite des 12 h) sans changer la clé.</div>
       </div>
       <div class="field">
         <label for="nbLatency">Latence</label>
@@ -653,6 +659,26 @@
       </div>
       <div class="kv"><span>Relances enchaînées</span><span id="autoCount">0</span></div>
       <div class="kv"><span>Prochaine relance</span><span id="autoNext">—</span></div>
+
+      <div class="field" style="margin-top:14px">
+        <label for="recycleDelay">Nouveau direct toutes les…</label>
+        <select id="recycleDelay">
+          <option value="0">Jamais</option>
+          <option value="30">30 secondes (test)</option>
+          <option value="90">1 min 30 (test)</option>
+          <option value="180">3 minutes (test)</option>
+          <option value="330">5 h 30</option>
+          <option value="660" selected>11 heures (recommandé)</option>
+          <option value="720">12 heures</option>
+          <option value="1380">23 heures</option>
+        </select>
+        <div class="hint">Au-delà de <b>12 h</b>, YouTube ne conserve pas l'enregistrement : pas de replay
+          et les heures de visionnage ne comptent plus. L'encodeur coupe donc proprement le flux avant
+          cette limite et enchaîne sur un <b>nouveau direct</b> : l'enregistrement repart de zéro.</div>
+      </div>
+      <div class="kv"><span>Prochain nouveau direct</span><span id="autoRecycle">—</span></div>
+      <div class="kv"><span>Recyclages</span><span id="autoRecycles">0</span></div>
+      <button class="btn ghost" id="doRecycle" style="margin-top:10px">Nouveau direct maintenant</button>
       <div class="hint" style="margin-top:8px">Un arrêt manuel ou une heure de fin programmée mettent fin à la boucle.</div>
     </div>
 
@@ -802,6 +828,23 @@
         </select>
       </div>
       <div class="kv"><span>Prochaine relance</span><span id="autoNext2">—</span></div>
+      <div class="field" style="margin-top:14px">
+        <label for="recycleDelay2">Nouveau direct toutes les…</label>
+        <select id="recycleDelay2">
+          <option value="0">Jamais</option>
+          <option value="30">30 secondes (test)</option>
+          <option value="90">1 min 30 (test)</option>
+          <option value="180">3 minutes (test)</option>
+          <option value="330">5 h 30</option>
+          <option value="660" selected>11 heures (recommandé)</option>
+          <option value="720">12 heures</option>
+          <option value="1380">23 heures</option>
+        </select>
+        <div class="hint">Coupe proprement le flux passé ce délai et repart sur un <b>nouveau direct</b>
+          (au-delà de 12 h, YouTube ne conserve pas l'enregistrement et les heures de visionnage ne comptent plus).</div>
+      </div>
+      <div class="kv"><span>Prochain nouveau direct</span><span id="autoRecycle2">—</span></div>
+      <button class="btn ghost" id="doRecycle2" style="margin-top:10px">Nouveau direct maintenant</button>
     </div>
 
     <div class="card">
@@ -2901,7 +2944,8 @@ async function createBroadcastFromApp() {
         resolution: ratio === '9:16' || ratio === '4:5' ? 'variable' : 'variable',
         ingestionType: 'rtmp',
       },
-      contentDetails: { isReusable: false },
+      // Clé réutilisable = à chaque reconnexion YouTube ouvre un nouveau direct
+      contentDetails: { isReusable: $('nbReusable') ? $('nbReusable').checked : true },
     };
     const stream = await regieApi.youtube('liveStreams',
       { part: 'snippet,cdn,contentDetails' },
@@ -3003,20 +3047,24 @@ function sendRatioToClipStart() {
 /* ================================================================== */
 /* RELANCE AUTOMATIQUE (boucle jusqu'à « Tout arrêter »)              */
 /* ================================================================== */
-const autoState = { enabled: true, delaySec: 120, restartAt: null, attempts: 0, tick: null };
+const autoState = { enabled: true, delaySec: 120, restartAt: null, attempts: 0,
+  recycleAt: null, recycleMin: 660, recycles: 0, tick: null };
 
 function wireAutoRestart() {
   const pairs = [['autoEnabled', 'autoDelay'], ['autoEnabled2', 'autoDelay2']];
-  const push = async (enabled, delaySec) => {
+  const push = async (enabled, delaySec, recycleMin) => {
     // On synchronise les deux cartes (Direct et Clips)
     $('autoEnabled').checked = enabled;
     $('autoEnabled2').checked = enabled;
     $('autoDelay').value = String(delaySec);
     $('autoDelay2').value = String(delaySec);
+    const rc = recycleMin === undefined ? Number($('recycleDelay').value) : recycleMin;
+    if ($('recycleDelay')) $('recycleDelay').value = String(rc);
+    if ($('recycleDelay2')) $('recycleDelay2').value = String(rc);
     try {
       const r = await fetch('/api/live/autorestart', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled, delaySec }),
+        body: JSON.stringify({ enabled, delaySec, recycleMin: rc }),
       });
       const d = await r.json();
       if (d.auto) Object.assign(autoState, d.auto);
@@ -3032,6 +3080,27 @@ function wireAutoRestart() {
     if (!chk || !sel) continue;
     chk.addEventListener('change', () => push(chk.checked, Number(sel.value) || 120));
     sel.addEventListener('change', () => push($('autoEnabled').checked, Number(sel.value) || 120));
+  }
+
+  for (const selId of ['recycleDelay', 'recycleDelay2']) {
+    const sel = $(selId);
+    if (!sel) continue;
+    sel.addEventListener('change', () => {
+      push($('autoEnabled').checked, Number($('autoDelay').value) || 120, Number(sel.value));
+    });
+  }
+
+  for (const btnId of ['doRecycle', 'doRecycle2']) {
+    const btn = $(btnId);
+    if (!btn) continue;
+    btn.addEventListener('click', async () => {
+      try {
+        const r = await fetch('/api/live/recycle', { method: 'POST' });
+        const d = await r.json();
+        if (d.error) { toast(d.error); return; }
+        toast(d.recycled ? 'Coupure propre : nouveau direct dans un instant' : 'Aucune diffusion en cours');
+      } catch { toast('Serveur injoignable'); }
+    });
   }
 
   $('autoStopNow').addEventListener('click', async () => {
@@ -3050,8 +3119,9 @@ function wireAutoRestart() {
     log('Arrêt définitif demandé : relance automatique coupée.', 'warn');
   });
 
-  // Délai par défaut demandé : 2 minutes
-  push(true, 120);
+  // Délai par défaut demandé : 2 minutes, nouveau direct toutes les 11 h
+  autoState.recycleMin = 660;
+  push(true, 120, 660);
   autoState.tick = setInterval(renderAuto, 1000);
 }
 
@@ -3087,6 +3157,19 @@ function renderAuto() {
     if (next2) next2.textContent = fmtClock(left);
     const c = $('autoCount');
     if (c) c.textContent = String(s.attempts || 0);
+    const rl = $('autoRecycle');
+    if (rl) rl.textContent = s.recycleAt ? fmtClock(left) : (s.recycleMin ? 'en attente' : 'désactivé');
+    const rl2 = $('autoRecycle2');
+    if (rl2) rl2.textContent = s.recycleAt ? fmtClock(left) : (s.recycleMin ? 'en attente' : 'désactivé');
+    const rc = $('autoRecycles');
+    if (rc) rc.textContent = String(s.recycles || 0);
+  } else if (s.recycleAt && liveNow) {
+    // Pas de relance en attente : on affiche le compte à rebours du prochain direct
+    const left = Math.max(0, Math.round((s.recycleAt - Date.now()) / 1000));
+    if (banner) {
+      banner.classList.add('show');
+      $('autoTxt').innerHTML = `Nouveau direct dans <b>${fmtClock(left)}</b>`;
+    }
   } else {
     if (banner) banner.classList.remove('show');
     const next = $('autoNext');
@@ -3095,6 +3178,12 @@ function renderAuto() {
     if (next2) next2.textContent = s.enabled ? 'en attente' : 'désactivée';
     const c = $('autoCount');
     if (c) c.textContent = String(s.attempts || 0);
+    const rl = $('autoRecycle');
+    if (rl) rl.textContent = s.recycleMin ? 'en attente' : 'désactivé';
+    const rl2 = $('autoRecycle2');
+    if (rl2) rl2.textContent = s.recycleMin ? 'en attente' : 'désactivé';
+    const rc = $('autoRecycles');
+    if (rc) rc.textContent = String(s.recycles || 0);
   }
 
   // État visuel des cartes
@@ -3111,6 +3200,13 @@ function syncAutoFromState(state) {
   autoState.delaySec = state.auto.delaySec;
   autoState.restartAt = state.auto.restartAt;
   autoState.attempts = state.auto.attempts || 0;
+  autoState.recycleAt = state.auto.recycleAt || null;
+  autoState.recycleMin = state.auto.recycleMin || 0;
+  autoState.recycles = state.auto.recycles || 0;
+  if ($('recycleDelay') && state.auto.recycleMin !== undefined) {
+    if ($('recycleDelay').value !== String(state.auto.recycleMin)) $('recycleDelay').value = String(state.auto.recycleMin);
+    if ($('recycleDelay2').value !== String(state.auto.recycleMin)) $('recycleDelay2').value = String(state.auto.recycleMin);
+  }
   if ($('autoEnabled')) $('autoEnabled').checked = state.auto.enabled;
   if ($('autoEnabled2')) $('autoEnabled2').checked = state.auto.enabled;
   if ($('autoDelay')) $('autoDelay').value = String(state.auto.delaySec);
@@ -3293,5 +3389,5 @@ $('permLater').addEventListener('click', () => {
 });
 $('permModal').addEventListener('click', (e) => { if (e.target.id === 'permModal') hidePermModal(); });
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a55bd250fccf9eca',t:'MTc5Mzg4MTMyMQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a55bd250fccf9eca',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
