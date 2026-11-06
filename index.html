@@ -180,6 +180,19 @@
   .badge.warn{background:rgba(217,119,6,.1);color:var(--warn);border-color:rgba(217,119,6,.25)}
   .switch{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--txt-muted);cursor:pointer}
   .switch input{width:auto;accent-color:var(--accent2);width:18px;height:18px}
+  #lockOverlay{position:fixed;inset:0;background:rgba(255,255,255,.98);z-index:9999;
+    display:none;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(6px)}
+  #lockOverlay.show{display:flex}
+  .lock-box{width:100%;max-width:340px;text-align:center}
+  .lock-ico{width:52px;height:52px;border-radius:14px;background:var(--panel3);display:grid;place-items:center;margin:0 auto 14px}
+  .lock-ico svg{width:24px;height:24px;stroke:var(--txt);fill:none;stroke-width:2;stroke-linecap:round}
+  .lock-box h3{margin:0 0 6px;font-size:17px}
+  .lock-box p{margin:0 0 16px;font-size:13.5px;color:var(--dim);line-height:1.5}
+  .lock-box input{width:100%;padding:14px 16px;font-size:16px;border:1px solid var(--line2);border-radius:12px;
+    background:#fff;color:var(--txt);outline:none;text-align:center}
+  .lock-box input:focus{border-color:var(--accent)}
+  .lock-box .btn{width:100%;margin-top:12px;justify-content:center}
+  .lock-msg{margin-top:12px;font-size:13px;color:var(--err);min-height:18px}
   .toast{
     position:fixed;left:50%;transform:translateX(-50%) translateY(80px);bottom:76px;z-index:60;
     background:#ffffff;color:var(--txt);border:1px solid var(--line2);font-size:13px;font-weight:700;padding:11px 18px;border-radius:11px;
@@ -917,6 +930,22 @@
       <div class="hint">Nécessaire uniquement pour le mode <b>Caméra</b>. Le mode <b>Clips</b> et la <b>Régie</b> n'en ont pas besoin.</div>
     </div>
 
+    <div class="card" id="cardSecurity">
+      <h2>Sécurité</h2>
+      <div class="kv"><span>Accès à cette page</span><span id="authState">protégé par mot de passe</span></div>
+      <button class="btn ghost" id="btnLock" style="margin-top:10px">Verrouiller maintenant</button>
+      <div class="field" style="margin-top:16px">
+        <label for="pwCurrent">Changer le mot de passe</label>
+        <input type="password" id="pwCurrent" placeholder="Mot de passe actuel" autocomplete="current-password">
+      </div>
+      <div class="field">
+        <input type="password" id="pwNext" placeholder="Nouveau mot de passe (6 caractères min.)" autocomplete="new-password">
+      </div>
+      <button class="btn primary" id="btnChangePw">Enregistrer le nouveau mot de passe</button>
+      <div class="hint" style="margin-top:8px">Sans mot de passe, personne ne peut voir ni arrêter ta diffusion,
+        même en connaissant l'adresse du serveur. Après 6 essais ratés, l'accès est bloqué 10 minutes.</div>
+    </div>
+
     <div class="card">
       <h2>Serveur d'ingestion</h2>
       <div class="kv"><span>URL RTMP</span><span style="font-family:ui-monospace,monospace;font-size:11.5px">rtmp://a.rtmp.youtube.com/live2</span></div>
@@ -1114,6 +1143,19 @@
   </div>
 </div>
 <div class="toast" id="toast"></div>
+
+<div id="lockOverlay">
+  <div class="lock-box">
+    <div class="lock-ico">
+      <svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+    </div>
+    <h3>Session verrouillée</h3>
+    <p>Le mot de passe est de nouveau nécessaire pour reprendre la main.</p>
+    <input type="password" id="lockPw" placeholder="Mot de passe" autocomplete="current-password">
+    <button class="btn primary" id="lockOk">Déverrouiller</button>
+    <div class="lock-msg" id="lockMsg"></div>
+  </div>
+</div>
 
 <script>
 'use strict';
@@ -3419,6 +3461,83 @@ $('permLater').addEventListener('click', () => {
   toast('Tu pourras les donner au moment de démarrer');
 });
 $('permModal').addEventListener('click', (e) => { if (e.target.id === 'permModal') hidePermModal(); });
+
+/* ================================================================== */
+/* SÉCURITÉ : verrouillage de la session                              */
+/* ================================================================== */
+(function wireSecurity() {
+  const overlay = $('lockOverlay');
+
+  function showLock(msg) {
+    if (!overlay) return;
+    overlay.classList.add('show');
+    $('lockMsg').textContent = msg || '';
+    setTimeout(() => { try { $('lockPw').focus(); } catch {} }, 120);
+  }
+
+  async function unlock() {
+    const pw = $('lockPw').value;
+    if (!pw) return;
+    $('lockMsg').textContent = '';
+    try {
+      const r = await fetch('/api/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) { $('lockPw').value = ''; overlay.classList.remove('show'); location.reload(); return; }
+      $('lockMsg').textContent = d.error || 'Mot de passe incorrect.';
+    } catch {
+      $('lockMsg').textContent = 'Serveur injoignable.';
+    }
+  }
+
+  if ($('lockOk')) $('lockOk').addEventListener('click', unlock);
+  if ($('lockPw')) $('lockPw').addEventListener('keydown', (e) => { if (e.key === 'Enter') unlock(); });
+
+  // Toute réponse 401 de l'API réaffiche l'écran de verrouillage
+  const origFetch = window.fetch.bind(window);
+  window.fetch = async (...args) => {
+    const r = await origFetch(...args);
+    if (r.status === 401) {
+      let isAuthCall = false;
+      try {
+        const u = String(typeof args[0] === 'string' ? args[0] : args[0].url || '');
+        isAuthCall = u.includes('/api/login') || u.includes('/api/logout');
+      } catch {}
+      if (!isAuthCall) showLock('Session expirée : entre le mot de passe pour continuer.');
+    }
+    return r;
+  };
+
+  if ($('btnLock')) {
+    $('btnLock').addEventListener('click', async () => {
+      try { await fetch('/api/logout', { method: 'POST' }); } catch {}
+      showLock('');
+      log('Session verrouillée.', 'warn');
+    });
+  }
+
+  if ($('btnChangePw')) {
+    $('btnChangePw').addEventListener('click', async () => {
+      const current = $('pwCurrent').value;
+      const next = $('pwNext').value;
+      if (!current || !next) { toast('Remplis les deux champs'); return; }
+      if (next.length < 6) { toast('6 caractères minimum'); return; }
+      try {
+        const r = await fetch('/api/auth/password', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ current, next }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) { toast(d.error || 'Modification impossible'); return; }
+        $('pwCurrent').value = ''; $('pwNext').value = '';
+        toast('Mot de passe modifié');
+        log('Mot de passe de la page modifié.', 'ok');
+      } catch { toast('Serveur injoignable'); }
+    });
+  }
+})();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a55c02578b4286d9',t:'MTc5Mzg4MzI4OA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a55c02578b4286d9',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
