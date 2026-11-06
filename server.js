@@ -185,7 +185,7 @@ const live = {
   // puis on relance la même session, en boucle, jusqu'à un arrêt explicite.
   auto: {
     enabled: true,
-    delaySec: 120,
+    delaySec: 15,   // relance quasi immédiate quand la vidéo s'arrête
     timer: null,
     restartAt: 0,      // horodatage de la prochaine relance
     attempts: 0,       // nombre de relances enchaînées
@@ -670,6 +670,16 @@ function cachePath(clip, opts) {
  */
 const DIRECT_AUDIO = new Set(['aac', 'mp3']);
 
+/** Le clip a-t-il déjà le rapport d'image demandé (à 2 % près) ? */
+function ratioMatches(clip, ratio) {
+  if (!ratio || ratio === 'auto') return true;
+  const r = RATIOS[ratio];
+  if (!r || !clip.width || !clip.height) return true;
+  const src = clip.width / clip.height;
+  const want = r.w / r.h;
+  return Math.abs(src - want) / want < 0.02;
+}
+
 function canDirectPlay(clip) {
   if (!clip || !clip.duration) return false;
   // Découpe demandée → il faut réencoder
@@ -759,7 +769,11 @@ async function startClip(clipId, options, reloop = false) {
   if (live.proc) throw new Error('Une diffusion est déjà en cours.');
 
   // 1) Préparation / cache — ou lecture directe pour les vidéos déjà conformes
-  const direct = canDirectPlay(clip);
+  const direct = canDirectPlay(clip) && ratioMatches(clip, opts.ratio);
+  if (canDirectPlay(clip) && !direct) {
+    logAll('info', `Format demandé ${opts.ratio} alors que la vidéo est en `
+      + `${clip.width}×${clip.height} : conversion en une passe (peut être long sur une très longue vidéo).`);
+  }
   let prepared;
   if (direct) {
     prepared = clipPath(clip);
@@ -1778,6 +1792,21 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { clip, probe: info });
     }
 
+    // Supprimer un clip de la liste (le fichier n'est effacé que s'il est dans clips/)
+    if (p === '/api/clips/delete' && req.method === 'POST') {
+      const body = JSON.parse((await readBody(req, 65536)).toString() || '{}');
+      const clip = clips.get(String(body.id || ''));
+      if (!clip) return json(res, 404, { error: 'Clip introuvable.' });
+      if (live.clipId === clip.id) return json(res, 409, { error: 'Ce clip est en cours de diffusion.' });
+      clips.delete(clip.id);
+      saveLibrary();
+      try {
+        if (clip.file && clip.file.startsWith('clips' + path.sep)) fs.unlinkSync(clipPath(clip));
+      } catch {}
+      logAll('info', `Clip supprimé : « ${clip.title} »`);
+      return json(res, 200, { ok: true });
+    }
+
     // Enregistrer un fichier déjà présent sur le serveur (gros fichiers : rsync/scp)
     if (p === '/api/clips/adopt' && req.method === 'POST') {
       const body = JSON.parse((await readBody(req, 1024 * 1024)).toString() || '{}');
@@ -1900,9 +1929,29 @@ const server = http.createServer(async (req, res) => {
       if (!clip) return json(res, 404, { error: 'Clip introuvable.' });
       if (!clip.file) return json(res, 400, { error: 'Le téléchargement du lien n\'est pas terminé.' });
 
+      // Aucune clé à saisir : si le serveur est autorisé sur YouTube, il crée
+      // lui-même le direct et récupère sa clé avant de démarrer FFmpeg.
+      let auto = null;
+      let streamKey = String(body.streamKey || '').trim();
+      if (!streamKey && live.auto.autoBroadcast && ytReady()) {
+        try {
+          const b = await createLiveBroadcast();
+          streamKey = b.streamKey;
+          live.auto.lastKey = b.streamKey;
+          live.auto.lastIngest = b.ingest;
+          auto = { watchUrl: b.watchUrl, broadcastId: b.broadcastId, title: b.title };
+          logAll('ok', `Nouveau direct créé automatiquement : ${b.watchUrl}`);
+        } catch (e) {
+          logAll('error', 'Création du direct impossible : ' + e.message);
+        }
+      }
+      if (!streamKey) {
+        streamKey = live.auto.lastKey || live.streamKey || '';
+      }
+
       const options = {
-        preset: body.preset, fps: body.fps, height: body.height,
-        streamKey: body.streamKey, ingest: body.ingest, mode: body.mode || 'youtube',
+        preset: body.preset, fps: body.fps, height: body.height, ratio: body.ratio,
+        streamKey, ingest: body.ingest, mode: body.mode || 'youtube',
         durationMin: body.durationMin || null, untilTs: body.untilTs || null,
       };
 
@@ -1911,7 +1960,7 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { scheduled: true, startAt: Number(body.startAt), state: publicState() });
       }
       const r = await startClip(clip.id, options);
-      return json(res, 200, { started: true, ...r, state: publicState() });
+      return json(res, 200, { started: true, ...r, auto, state: publicState() });
     }
 
     /* Réglage de la relance automatique */
