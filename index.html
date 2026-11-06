@@ -97,7 +97,7 @@
 
   /* ---------- Aperçu ---------- */
   .preview{
-    position:relative; border-radius:var(--radius); overflow:hidden; background:#ffffff;
+    position:relative; border-radius:var(--radius); overflow:hidden; background:#0f172a;
     aspect-ratio:16/9; border:1px solid var(--line); margin-bottom:12px;
   }
   .preview video{width:100%;height:100%;object-fit:cover;display:block;transform:scaleX(-1);opacity:0;transition:opacity .3s}
@@ -180,31 +180,9 @@
   .badge.warn{background:rgba(217,119,6,.1);color:var(--warn);border-color:rgba(217,119,6,.25)}
   .switch{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--txt-muted);cursor:pointer}
   .switch input{width:auto;accent-color:var(--accent2);width:18px;height:18px}
-  .cam-bar{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 6px}
-  .cam-bar .cam-btn{display:flex;align-items:center;justify-content:center;gap:7px;
-    padding:13px 10px;font:inherit;font-size:13px;font-weight:700;border-radius:12px;
-    border:1px solid var(--line2);background:#fff;color:var(--txt);cursor:pointer}
-  .cam-bar .cam-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
-  .cam-bar .cam-btn[aria-pressed="false"]{background:var(--panel3);color:var(--dim);border-style:dashed}
-  .cam-bar .cam-btn[aria-pressed="false"] span::after{content:" · coupé";font-weight:600}
-  .cam-bar .cam-btn.danger{grid-column:1 / -1;color:var(--err);border-color:#fecaca;background:#fff5f5}
-  .cam-bar .cam-btn:disabled{opacity:.45}
-  #lockOverlay{position:fixed;inset:0;background:rgba(255,255,255,.98);z-index:9999;
-    display:none;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(6px)}
-  #lockOverlay.show{display:flex}
-  .lock-box{width:100%;max-width:340px;text-align:center}
-  .lock-ico{width:52px;height:52px;border-radius:14px;background:var(--panel3);display:grid;place-items:center;margin:0 auto 14px}
-  .lock-ico svg{width:24px;height:24px;stroke:var(--txt);fill:none;stroke-width:2;stroke-linecap:round}
-  .lock-box h3{margin:0 0 6px;font-size:17px}
-  .lock-box p{margin:0 0 16px;font-size:13.5px;color:var(--dim);line-height:1.5}
-  .lock-box input{width:100%;padding:14px 16px;font-size:16px;border:1px solid var(--line2);border-radius:12px;
-    background:#fff;color:var(--txt);outline:none;text-align:center}
-  .lock-box input:focus{border-color:var(--accent)}
-  .lock-box .btn{width:100%;margin-top:12px;justify-content:center}
-  .lock-msg{margin-top:12px;font-size:13px;color:var(--err);min-height:18px}
   .toast{
     position:fixed;left:50%;transform:translateX(-50%) translateY(80px);bottom:76px;z-index:60;
-    background:#ffffff;color:var(--txt);border:1px solid var(--line2);font-size:13px;font-weight:700;padding:11px 18px;border-radius:11px;
+    background:#0f172a;color:#ffffff;font-size:13px;font-weight:700;padding:11px 18px;border-radius:11px;
     opacity:0;transition:.25s;pointer-events:none;box-shadow:0 10px 30px rgba(15,23,42,.18);max-width:90vw;text-align:center
   }
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -216,18 +194,11 @@
   .banner b{font-weight:700;color:#78350f}
   .banner a{color:var(--accent2);text-decoration:none}
   .autonomy{
-    display:flex; gap:11px; align-items:flex-start;
     background:linear-gradient(135deg,rgba(22,163,74,.08),rgba(2,132,199,.06));
     border:1px solid rgba(22,163,74,.25); border-radius:var(--radius); padding:13px; margin-bottom:12px;
   }
-  .autonomy > svg{
-    width:22px; height:22px; flex:0 0 auto; margin-top:1px;
-    stroke:#15803d; stroke-width:1.8; fill:none;
-  }
-  /* seul le premier <b> est un titre de bloc : le gras dans le paragraphe reste en ligne */
-  .autonomy > div > b:first-child{display:block;font-size:13.5px;color:#15803d;margin-bottom:3px}
+  .autonomy b{display:block;font-size:13.5px;color:#15803d;margin-bottom:3px}
   .autonomy p{margin:0;font-size:12px;color:var(--txt-muted);line-height:1.5}
-  .autonomy p b{color:#15803d}
 
   /* ---------- Clips ---------- */
   .clip{
@@ -347,8 +318,8 @@
 
   /* ---------- Régie (lecteur + chat + OAuth) ---------- */
   .video-container{
-    aspect-ratio:16/9;background:#ffffff;border-radius:var(--radius);overflow:hidden;
-    border:1px solid var(--line);margin-bottom:12px;box-shadow:0 1px 4px rgba(15,23,42,.04)
+    aspect-ratio:16/9;background:#000;border-radius:var(--radius);overflow:hidden;
+    border:1px solid var(--line);margin-bottom:12px
   }
   .video-container iframe{display:block;width:100%;height:100%;border:0}
   .chat-frame{width:100%;height:380px;border:1px solid var(--line);border-radius:12px;background:#ffffff}
@@ -364,27 +335,6 @@
     background:rgba(22,163,74,.1);color:var(--ok);border:1px solid rgba(22,163,74,.25);margin-left:6px}
   .regie-badge.off{background:#f1f5f9;color:var(--dim);border-color:var(--line)}
   button.primary:disabled,button.ghost:disabled{opacity:.45;cursor:not-allowed}
-
-  /* ---------- Relance automatique ---------- */
-  .auto-banner{
-    position:fixed; left:0; right:0; bottom:calc(62px + env(safe-area-inset-bottom)); z-index:50;
-    display:none; justify-content:center; pointer-events:none; padding:0 12px;
-  }
-  .auto-banner.show{display:flex}
-  .auto-inner{
-    pointer-events:auto; display:flex; align-items:center; gap:10px;
-    background:#ffffff; border:1px solid var(--line2); border-left:4px solid var(--warn);
-    border-radius:12px; padding:10px 12px; box-shadow:0 8px 26px rgba(15,23,42,.16);
-    max-width:520px; width:100%;
-  }
-  .auto-inner svg{width:20px;height:20px;flex:0 0 auto;stroke:var(--warn);fill:none;stroke-width:1.8}
-  .auto-txt{flex:1;min-width:0;font-size:12px;line-height:1.4;color:var(--txt)}
-  .auto-txt b{font-variant-numeric:tabular-nums;color:#b45309}
-  .auto-inner button{
-    flex:0 0 auto;font:inherit;font-size:11.5px;font-weight:800;padding:8px 11px;border-radius:9px;
-    border:1px solid var(--line2);background:#fff;color:var(--err);cursor:pointer
-  }
-  .auto-card-off{opacity:.55}
   .kv{display:flex;justify-content:space-between;font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--line)}
   .kv:last-child{border-bottom:0}
   .kv span:first-child{color:var(--dim)}
@@ -500,12 +450,6 @@
       </div>
       <div class="field">
         <label class="switch"><input type="checkbox" id="nbDvr" checked> Enregistrement (VOD) et rembobinage (DVR)</label>
-        <div class="hint">À laisser coché : c'est ce qui crée le replay et fait compter les heures de visionnage.</div>
-      </div>
-      <div class="field">
-        <label class="switch"><input type="checkbox" id="nbReusable" checked> Clé de flux réutilisable</label>
-        <div class="hint">Indispensable pour les longues diffusions : à chaque reconnexion, YouTube ouvre un
-          <b>nouveau direct</b> (donc un nouvel enregistrement, avant la limite des 12 h) sans changer la clé.</div>
       </div>
       <div class="field">
         <label for="nbLatency">Latence</label>
@@ -615,25 +559,6 @@
       </div>
     </div>
 
-    <div class="cam-bar" id="camBar">
-      <button class="cam-btn" id="btnCamToggle" aria-pressed="true">
-        <svg viewBox="0 0 24 24"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-        <span id="camLbl">Caméra active</span>
-      </button>
-      <button class="cam-btn" id="btnMicToggle" aria-pressed="true">
-        <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8"/></svg>
-        <span id="micLbl">Micro actif</span>
-      </button>
-      <button class="cam-btn danger" id="btnCamOff">
-        <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
-        <span>Tout couper</span>
-      </button>
-    </div>
-    <div class="hint" id="camBarHint" style="margin:-6px 0 12px">
-      Ces boutons coupent <b>vraiment</b> la caméra et le micro du téléphone : la lumière s'éteint
-      et plus rien n'est capturé, même si l'onglet reste ouvert.
-    </div>
-
     <div class="actions">
       <button class="primary" id="btnStart">Démarrer le direct</button>
       <button class="ghost" id="btnStop" style="display:none">Stop</button>
@@ -678,49 +603,6 @@
         </div>
         <div class="hint" id="camEndHint">La diffusion continue jusqu'à l'arrêt manuel.</div>
       </div>
-    </div>
-
-
-    <div class="card" id="cardAuto">
-      <h2>Relance automatique</h2>
-      <div class="field">
-        <label class="switch"><input type="checkbox" id="autoEnabled" checked> Relancer la diffusion quand elle s'arrête</label>
-        <div class="hint">Après chaque fin de diffusion, l'encodeur attend puis <b>relance tout seul</b>, en boucle,
-          jusqu'à ce que tu cliques sur <b>Tout arrêter</b>.</div>
-      </div>
-      <div class="field">
-        <label for="autoDelay">Délai avant relance</label>
-        <select id="autoDelay">
-          <option value="30">30 secondes</option>
-          <option value="60">1 minute</option>
-          <option value="120" selected>2 minutes</option>
-          <option value="300">5 minutes</option>
-          <option value="600">10 minutes</option>
-        </select>
-      </div>
-      <div class="kv"><span>Relances enchaînées</span><span id="autoCount">0</span></div>
-      <div class="kv"><span>Prochaine relance</span><span id="autoNext">—</span></div>
-
-      <div class="field" style="margin-top:14px">
-        <label for="recycleDelay">Nouveau direct toutes les…</label>
-        <select id="recycleDelay">
-          <option value="0">Jamais</option>
-          <option value="30">30 secondes (test)</option>
-          <option value="90">1 min 30 (test)</option>
-          <option value="180">3 minutes (test)</option>
-          <option value="330">5 h 30</option>
-          <option value="660" selected>11 heures (recommandé)</option>
-          <option value="720">12 heures</option>
-          <option value="1380">23 heures</option>
-        </select>
-        <div class="hint">Au-delà de <b>12 h</b>, YouTube ne conserve pas l'enregistrement : pas de replay
-          et les heures de visionnage ne comptent plus. L'encodeur coupe donc proprement le flux avant
-          cette limite et enchaîne sur un <b>nouveau direct</b> : l'enregistrement repart de zéro.</div>
-      </div>
-      <div class="kv"><span>Prochain nouveau direct</span><span id="autoRecycle">—</span></div>
-      <div class="kv"><span>Recyclages</span><span id="autoRecycles">0</span></div>
-      <button class="btn ghost" id="doRecycle" style="margin-top:10px">Nouveau direct maintenant</button>
-      <div class="hint" style="margin-top:8px">Un arrêt manuel ou une heure de fin programmée mettent fin à la boucle.</div>
     </div>
 
     <div class="card">
@@ -849,54 +731,6 @@
         </div>
         <div class="hint" id="linkHint">Le serveur télécharge la vidéo (yt-dlp) puis la garde en local.</div>
       </div>
-      <div class="field" style="margin-top:12px">
-        <label for="adoptInput">…ou un fichier déjà sur le serveur</label>
-        <div class="keyrow">
-          <input type="text" id="adoptInput" placeholder="data/clips/ma-video-11h.mp4" autocomplete="off" spellcheck="false">
-          <button class="iconbtn" id="btnAdopt" aria-label="Enregistrer le fichier">
-            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-        </div>
-        <div class="hint" id="adoptHint">Pour les grosses vidéos (11 h ≈ 13 Go) : transfère le fichier en
-          <b>rsync</b> ou <b>scp</b> puis indique son chemin ici. Rien n'est ré-encodé s'il est déjà en H.264/AAC.</div>
-      </div>
-    </div>
-
-
-    <div class="card" id="cardAutoClips">
-      <h2>Relance automatique</h2>
-      <div class="field">
-        <label class="switch"><input type="checkbox" id="autoEnabled2" checked> Relancer le clip quand il se termine</label>
-        <div class="hint">Enchaîne les diffusions en boucle, avec le délai ci-dessous, jusqu'à <b>Tout arrêter</b>.</div>
-      </div>
-      <div class="field">
-        <label for="autoDelay2">Délai avant relance</label>
-        <select id="autoDelay2">
-          <option value="30">30 secondes</option>
-          <option value="60">1 minute</option>
-          <option value="120" selected>2 minutes</option>
-          <option value="300">5 minutes</option>
-          <option value="600">10 minutes</option>
-        </select>
-      </div>
-      <div class="kv"><span>Prochaine relance</span><span id="autoNext2">—</span></div>
-      <div class="field" style="margin-top:14px">
-        <label for="recycleDelay2">Nouveau direct toutes les…</label>
-        <select id="recycleDelay2">
-          <option value="0">Jamais</option>
-          <option value="30">30 secondes (test)</option>
-          <option value="90">1 min 30 (test)</option>
-          <option value="180">3 minutes (test)</option>
-          <option value="330">5 h 30</option>
-          <option value="660" selected>11 heures (recommandé)</option>
-          <option value="720">12 heures</option>
-          <option value="1380">23 heures</option>
-        </select>
-        <div class="hint">Coupe proprement le flux passé ce délai et repart sur un <b>nouveau direct</b>
-          (au-delà de 12 h, YouTube ne conserve pas l'enregistrement et les heures de visionnage ne comptent plus).</div>
-      </div>
-      <div class="kv"><span>Prochain nouveau direct</span><span id="autoRecycle2">—</span></div>
-      <button class="btn ghost" id="doRecycle2" style="margin-top:10px">Nouveau direct maintenant</button>
     </div>
 
     <div class="card">
@@ -956,22 +790,6 @@
       <div class="kv"><span>Microphone</span><span id="permMicKv">inconnu</span></div>
       <button class="copy" id="permBtnSettings" style="margin-top:10px">Demander / vérifier les autorisations</button>
       <div class="hint">Nécessaire uniquement pour le mode <b>Caméra</b>. Le mode <b>Clips</b> et la <b>Régie</b> n'en ont pas besoin.</div>
-    </div>
-
-    <div class="card" id="cardSecurity">
-      <h2>Sécurité</h2>
-      <div class="kv"><span>Accès à cette page</span><span id="authState">protégé par mot de passe</span></div>
-      <button class="btn ghost" id="btnLock" style="margin-top:10px">Verrouiller maintenant</button>
-      <div class="field" style="margin-top:16px">
-        <label for="pwCurrent">Changer le mot de passe</label>
-        <input type="password" id="pwCurrent" placeholder="Mot de passe actuel" autocomplete="current-password">
-      </div>
-      <div class="field">
-        <input type="password" id="pwNext" placeholder="Nouveau mot de passe (6 caractères min.)" autocomplete="new-password">
-      </div>
-      <button class="btn primary" id="btnChangePw">Enregistrer le nouveau mot de passe</button>
-      <div class="hint" style="margin-top:8px">Sans mot de passe, personne ne peut voir ni arrêter ta diffusion,
-        même en connaissant l'adresse du serveur. Après 6 essais ratés, l'accès est bloqué 10 minutes.</div>
     </div>
 
     <div class="card">
@@ -1162,34 +980,9 @@
   </div>
 </div>
 
-
-<div class="auto-banner" id="autoBanner">
-  <div class="auto-inner">
-    <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
-    <div class="auto-txt" id="autoTxt">Relance dans <b>2:00</b></div>
-    <button id="autoStopNow">Tout arrêter</button>
-  </div>
-</div>
 <div class="toast" id="toast"></div>
 
-<div id="lockOverlay">
-  <div class="lock-box">
-    <div class="lock-ico">
-      <svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-    </div>
-    <h3>Session verrouillée</h3>
-    <p>Le mot de passe est de nouveau nécessaire pour reprendre la main.</p>
-    <input type="password" id="lockPw" placeholder="Mot de passe" autocomplete="current-password">
-    <button class="btn primary" id="lockOk">Déverrouiller</button>
-    <div class="lock-msg" id="lockMsg"></div>
-  </div>
-</div>
-
 <script>
-/* Retour de connexion Google : on lit le fragment tout de suite,
-   car le routeur d'onglets remet le # à zéro ensuite. */
-window.__OAUTH_RAW = (location.hash || '').replace(/^#/, '');
-
 'use strict';
 
 /* ------------------------------------------------------------------ */
@@ -1363,7 +1156,6 @@ function startHttpMode() {
       if (st.stats) { state.stats = st.stats; renderStats(); }
       refreshNowPlaying(s2);
       refreshScheduleInfo(s2);
-      syncAutoFromState(s2);
       // Aligne l'état local du bouton caméra sur l'état serveur
       if (s2.live && s2.mode === 'camera' && !state.recording) { /* géré par l'UI */ }
     } catch {
@@ -1557,10 +1349,6 @@ async function openCamera() {
   closeCamera();
   const stream = await navigator.mediaDevices.getUserMedia(constraints);
   state.stream = stream;
-  camCtl.camOn = true;
-  const a0 = stream.getAudioTracks()[0];
-  if (a0 && !camCtl.micOn) a0.enabled = false;
-  setTimeout(paintCamBar, 0);
 
   const v = $('preview');
   v.srcObject = stream;
@@ -1569,7 +1357,6 @@ async function openCamera() {
   v.addEventListener('playing', () => v.classList.add('ready'), { once: true });
   $('placeholder').style.display = 'none';
   paintPermButton();
-  paintCamBar();
   $('previewWarn').classList.remove('show');
 
   const t = stream.getVideoTracks()[0];
@@ -1587,117 +1374,6 @@ async function openCamera() {
   await enumerateDevices();
   detectMime();
   return stream;
-}
-
-/* ------------------------------------------------------------------ */
-/* Caméra & micro : couper / reprendre réellement les périphériques   */
-/* ------------------------------------------------------------------ */
-const camCtl = { camOn: true, micOn: true, suspended: false };
-
-function camTracks() {
-  const st = state.stream;
-  if (!st) return { video: null, audio: null };
-  return { video: st.getVideoTracks()[0] || null, audio: st.getAudioTracks()[0] || null };
-}
-
-function wireCamBar() {
-  if (!$('btnCamToggle')) return;
-  $('btnCamToggle').addEventListener('click', toggleCamera);
-  $('btnMicToggle').addEventListener('click', () => muteMic(false));
-  $('btnCamOff').addEventListener('click', cameraOffAll);
-  paintCamBar();
-
-  // Quand l'onglet repasse au premier plan et que rien ne diffuse,
-  // on ne rallume pas la caméra tout seul.
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') paintCamBar();
-  });
-}
-
-function paintCamBar() {
-  const bar = $('camBar');
-  if (!bar) return;
-  bar.style.display = 'grid';
-  const cam = $('btnCamToggle'), mic = $('btnMicToggle'), off = $('btnCamOff');
-  if (!cam) return;
-  cam.setAttribute('aria-pressed', String(camCtl.camOn ? 'true' : 'false'));
-  mic.setAttribute('aria-pressed', String(camCtl.micOn ? 'true' : 'false'));
-  $('camLbl').textContent = camCtl.camOn ? 'Caméra active' : 'Caméra';
-  $('micLbl').textContent = camCtl.micOn ? 'Micro actif' : 'Micro';
-  off.disabled = !state.stream && !camCtl.camOn;
-  // Le direct ne peut pas continuer sans image : on désactive le démarrage
-  if ($('btnStart') && !state.recording) $('btnStart').disabled = !camCtl.camOn;
-}
-
-/** Coupe ou rétablit la caméra (libère la lumière du capteur). */
-async function toggleCamera() {
-  if (!state.stream) {
-    // Aucun flux ouvert : le bouton sert à rallumer la caméra
-    try {
-      await openCamera();
-      camCtl.camOn = true;
-      if (!camCtl.micOn) muteMic(true);
-      log('Caméra réactivée.', 'ok');
-    } catch (e) {
-      log('Impossible d’ouvrir la caméra : ' + e.message, 'error');
-      toast('Caméra indisponible');
-    }
-    paintCamBar();
-    return;
-  }
-  if (camCtl.camOn) {
-    if (state.recording) { toast('Coupe le direct avant de couper la caméra'); return; }
-    closeCamera();                     // libère vraiment le périphérique
-    camCtl.camOn = false;
-    $('placeholder').style.display = '';
-    $('resInfo').textContent = 'caméra coupée';
-    log('Caméra coupée : le capteur est libéré (voyant éteint).', 'warn');
-    paintCamBar();
-    return;
-  }
-  try {
-    await openCamera();                // redemande l'accès
-    camCtl.camOn = true;
-    if (!camCtl.micOn) muteMic(true);
-    log('Caméra réactivée.', 'ok');
-  } catch (e) {
-    log('Impossible de rouvrir la caméra : ' + e.message, 'error');
-  }
-  paintCamBar();
-}
-
-/** Coupe ou rétablit le micro (la piste reste ouverte mais devient muette). */
-function muteMic(forceMute) {
-  const { audio } = camTracks();
-  const wantOn = forceMute ? false : !camCtl.micOn;
-  if (audio) audio.enabled = wantOn;
-  camCtl.micOn = wantOn;
-  if (!wantOn) log('Micro coupé.', 'warn'); else log('Micro réactivé.', 'ok');
-  paintCamBar();
-}
-
-/** Coupe les deux d'un coup. */
-function cameraOffAll() {
-  if (state.recording) { toast('Coupe le direct avant de tout couper'); return; }
-  closeCamera();
-  camCtl.camOn = false;
-  camCtl.micOn = false;
-  $('placeholder').style.display = '';
-  $('resInfo').textContent = 'caméra et micro coupés';
-  log('Caméra et micro coupés : plus aucune capture.', 'warn');
-  paintCamBar();
-}
-
-/* Quand le direct s'arrête, on ne laisse pas la caméra tourner pour rien. */
-function releaseCameraIfIdle() {
-  if (state.recording) return;
-  if (!state.stream) return;
-  if (document.visibilityState === 'visible' && liveState && liveState.live) return;
-  closeCamera();
-  camCtl.camOn = false;
-  $('placeholder').style.display = '';
-  log('Direct terminé : caméra libérée automatiquement.', 'info');
-  paintCamBar();
 }
 
 function closeCamera() {
@@ -1899,9 +1575,6 @@ function stopEverything(reason, silent) {
   clearInterval(state.timerId);
   clearInterval(state.rateTimer);
   state.recording = false;
-
-  // On ne laisse pas la caméra tourner dans le vide après le direct
-  setTimeout(releaseCameraIfIdle, 400);
 
   const rec = state.recorder;
   state.recorder = null;
@@ -2303,7 +1976,6 @@ function addLink() {
 let npTimer = null;
 function refreshNowPlaying(liveState) {
   clipsState.live = liveState;
-  if (typeof syncAutoFromState === 'function') syncAutoFromState(liveState);
   const box = $('nowPlaying');
   if (!liveState || !liveState.live) {
     box.classList.remove('show');
@@ -2830,64 +2502,13 @@ function initRegie() {
 
     function clearAuth() { accessToken = ''; expiresAt = 0; refreshAuthUI(); }
 
-    /* Retour de la connexion Google en mode redirection :
-       le jeton arrive dans le fragment de l'URL (#access_token=…). */
-    setTimeout(function handleOAuthRedirectBack() {
-      const raw = window.__OAUTH_RAW || (location.hash || '').replace(/^#/, '');
-      if (!raw || !/access_token=|error=/.test(raw)) {
-        // On revient d'une tentative de connexion mais sans jeton :
-        // Google n'a pas rappelé la page (URI non autorisée sur ce client).
-        let tried = 0;
-        try {
-          tried = Number(sessionStorage.getItem('oauthPending') || 0);
-          if (tried) sessionStorage.removeItem('oauthPending');
-        } catch {}
-        if (tried) {
-          const uri = (() => { try { return sessionStorage.getItem('oauthRedirectUri') || (location.origin + '/'); } catch { return location.origin + '/'; } })();
-          regieLog('❌ Google n\'a pas renvoyé de jeton. Vérifie dans Google Cloud → Identifiants → '
-            + 'URI de redirection autorisés, la présence exacte de : ' + uri);
-        }
-        return;
-      }
-      const p = new URLSearchParams(raw);
-      const err = p.get('error');
-      const tok = p.get('access_token');
-      if (!err && !tok) return;
-
-      // On nettoie l'URL : le jeton ne doit pas rester visible ni dans l'historique
-      try { history.replaceState(null, '', location.pathname); } catch {}
-
-      if (err) {
-        const uri = (() => { try { return sessionStorage.getItem('oauthRedirectUri') || (location.origin + '/'); } catch { return location.origin + '/'; } })();
-        if (err === 'redirect_uri_mismatch' || err === 'invalid_request') {
-          regieLog('❌ Google refuse l\'adresse de retour. Dans Google Cloud → Identifiants → ton client OAuth → '
-            + '« URI de redirection autorisés », ajoute EXACTEMENT : ' + uri + '  (sans slash de plus, sans astérisque)');
-        } else if (err === 'access_denied') {
-          regieLog('❌ Autorisation refusée sur l\'écran Google. Recommence et clique sur « Autoriser ».');
-        } else {
-          regieLog('❌ Connexion refusée : ' + (p.get('error_description') || err));
-        }
-        return;
-      }
-      regieLog('Retour de Google reçu, jeton récupéré.', 'info');
-      const granted = p.get('scope') || '';
-      if (granted && !granted.includes('youtube')) {
-        regieLog('❌ Autorisation YouTube manquante. Reconnectez-vous en cochant la case YouTube.');
-        return;
-      }
-      try { sessionStorage.removeItem('oauthPending'); } catch {}
-      accessToken = tok;
-      const exp = Number(p.get('expires_in')) || 3600;
-      expiresAt = Date.now() + Math.max(0, exp - 60) * 1000;
-      authPending = false;
-      refreshAuthUI();
-      regieLog('✅ Connecté à Google. Vous pouvez vérifier votre direct ou enregistrer ses horaires.');
-    }, 1200);
-
     function handleAuthClick() {
       try {
         if (!['https:', 'http:'].includes(location.protocol)) {
           throw new Error('Hébergez la page en HTTP(S) pour utiliser la connexion Google.');
+        }
+        if (!(window.google && window.google.accounts && window.google.accounts.oauth2)) {
+          throw new Error('Le module Google n\'est pas chargé. Vérifiez Internet ou votre bloqueur, puis réessayez.');
         }
         const id = $r('clientIdInput').value.trim();
         if (!/^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(id)) {
@@ -2895,40 +2516,12 @@ function initRegie() {
         }
         saveField($r('clientIdInput'));
 
-        /* ---- Connexion par redirection directe -------------------------
-           On n'utilise plus la fenêtre surgissante de Google : sur Android
-           elle est bloquée (erreur « popup_closed »). On construit l'URL
-           d'autorisation nous-mêmes et on redirige la page. */
-        const redirectUri = location.origin + '/';
-        const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth'
-          + '?client_id=' + encodeURIComponent(id)
-          + '&redirect_uri=' + encodeURIComponent(redirectUri)
-          + '&response_type=token'
-          + '&scope=' + encodeURIComponent(scope)
-          + '&include_granted_scopes=true'
-          + '&prompt=consent';
-        try {
-          sessionStorage.setItem('oauthPending', '1');
-          sessionStorage.setItem('oauthRedirectUri', redirectUri);
-        } catch {}
-        regieLog('Redirection vers Google… (adresse de retour : ' + redirectUri + ')');
-        location.href = authUrl;
-        return;
-
         if (!tokenClient || oauthClientId !== id) {
           clearAuth();
           oauthClientId = id;
           tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: id,
             scope,
-            // Sur mobile, la fenêtre surgissante est souvent bloquée
-            // (erreur « popup_closed »). Le mode redirection revient sur la
-            // page avec le jeton dans l'URL : beaucoup plus fiable.
-            ux_mode: (() => {
-              const m = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'redirect' : 'popup';
-              try { sessionStorage.setItem('oauthUxMode', m); } catch {}
-              return m;
-            })(),
             callback: (response) => {
               authPending = false;
               if (response.error || !response.access_token) {
@@ -2954,7 +2547,6 @@ function initRegie() {
           });
         }
         authPending = true;
-        try { sessionStorage.setItem('oauthPending', String(Date.now())); } catch {}
         refreshAuthUI();
         tokenClient.requestAccessToken({ prompt: 'consent' });
       } catch (error) {
@@ -3228,8 +2820,7 @@ async function createBroadcastFromApp() {
         resolution: ratio === '9:16' || ratio === '4:5' ? 'variable' : 'variable',
         ingestionType: 'rtmp',
       },
-      // Clé réutilisable = à chaque reconnexion YouTube ouvre un nouveau direct
-      contentDetails: { isReusable: $('nbReusable') ? $('nbReusable').checked : true },
+      contentDetails: { isReusable: false },
     };
     const stream = await regieApi.youtube('liveStreams',
       { part: 'snippet,cdn,contentDetails' },
@@ -3327,177 +2918,6 @@ function sendRatioToClipStart() {
   return currentRatio(true);
 }
 
-
-/* ================================================================== */
-/* RELANCE AUTOMATIQUE (boucle jusqu'à « Tout arrêter »)              */
-/* ================================================================== */
-const autoState = { enabled: true, delaySec: 120, restartAt: null, attempts: 0,
-  recycleAt: null, recycleMin: 660, recycles: 0, tick: null };
-
-function wireAutoRestart() {
-  const pairs = [['autoEnabled', 'autoDelay'], ['autoEnabled2', 'autoDelay2']];
-  const push = async (enabled, delaySec, recycleMin) => {
-    // On synchronise les deux cartes (Direct et Clips)
-    $('autoEnabled').checked = enabled;
-    $('autoEnabled2').checked = enabled;
-    $('autoDelay').value = String(delaySec);
-    $('autoDelay2').value = String(delaySec);
-    const rc = recycleMin === undefined ? Number($('recycleDelay').value) : recycleMin;
-    if ($('recycleDelay')) $('recycleDelay').value = String(rc);
-    if ($('recycleDelay2')) $('recycleDelay2').value = String(rc);
-    try {
-      const r = await fetch('/api/live/autorestart', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled, delaySec, recycleMin: rc }),
-      });
-      const d = await r.json();
-      if (d.auto) Object.assign(autoState, d.auto);
-      log(`Relance automatique ${enabled ? 'activée' : 'désactivée'} · délai ${fmtDelay(delaySec)}`,
-        enabled ? 'info' : 'warn');
-    } catch { toast('Réglage impossible (serveur injoignable)'); }
-    renderAuto();
-  };
-
-  for (const [chkId, selId] of pairs) {
-    const chk = $(chkId);
-    const sel = $(selId);
-    if (!chk || !sel) continue;
-    chk.addEventListener('change', () => push(chk.checked, Number(sel.value) || 120));
-    sel.addEventListener('change', () => push($('autoEnabled').checked, Number(sel.value) || 120));
-  }
-
-  for (const selId of ['recycleDelay', 'recycleDelay2']) {
-    const sel = $(selId);
-    if (!sel) continue;
-    sel.addEventListener('change', () => {
-      push($('autoEnabled').checked, Number($('autoDelay').value) || 120, Number(sel.value));
-    });
-  }
-
-  for (const btnId of ['doRecycle', 'doRecycle2']) {
-    const btn = $(btnId);
-    if (!btn) continue;
-    btn.addEventListener('click', async () => {
-      try {
-        const r = await fetch('/api/live/recycle', { method: 'POST' });
-        const d = await r.json();
-        if (d.error) { toast(d.error); return; }
-        toast(d.recycled ? 'Coupure propre : nouveau direct dans un instant' : 'Aucune diffusion en cours');
-      } catch { toast('Serveur injoignable'); }
-    });
-  }
-
-  $('autoStopNow').addEventListener('click', async () => {
-    if (!confirm('Arrêter la diffusion et désactiver la relance automatique ?')) return;
-    try {
-      await fetch('/api/live/stop', { method: 'POST' });
-      await fetch('/api/live/autorestart', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: false }),
-      });
-    } catch {}
-    // L'arrêt côté serveur coupe déjà la relance ; on reflète l'état
-    $('autoEnabled').checked = false;
-    $('autoEnabled2').checked = false;
-    toast('Diffusion arrêtée — relance désactivée');
-    log('Arrêt définitif demandé : relance automatique coupée.', 'warn');
-  });
-
-  // Délai par défaut demandé : 2 minutes, nouveau direct toutes les 11 h
-  autoState.recycleMin = 660;
-  push(true, 120, 660);
-  autoState.tick = setInterval(renderAuto, 1000);
-}
-
-function fmtDelay(sec) {
-  sec = Math.round(sec || 0);
-  if (sec < 60) return sec + ' s';
-  const m = Math.floor(sec / 60), r = sec % 60;
-  return m + ' min' + (r ? ' ' + r + ' s' : '');
-}
-
-function fmtClock(sec) {
-  sec = Math.max(0, Math.round(sec || 0));
-  const m = Math.floor(sec / 60), r = sec % 60;
-  return m + ':' + String(r).padStart(2, '0');
-}
-
-function renderAuto() {
-  const s = autoState;
-  const banner = $('autoBanner');
-  const liveNow = typeof clipsState !== 'undefined' && clipsState.live ? clipsState.live : null;
-
-  // Compte à rebours
-  if (s.restartAt) {
-    const left = Math.max(0, Math.round((s.restartAt - Date.now()) / 1000));
-    if (banner) {
-      banner.classList.add('show');
-      $('autoTxt').innerHTML = `Relance dans <b>${fmtClock(left)}</b>`
-        + (s.attempts ? ` · relance n°${s.attempts + 1}` : '');
-    }
-    const next = $('autoNext');
-    if (next) next.textContent = fmtClock(left);
-    const next2 = $('autoNext2');
-    if (next2) next2.textContent = fmtClock(left);
-    const c = $('autoCount');
-    if (c) c.textContent = String(s.attempts || 0);
-    const rl = $('autoRecycle');
-    if (rl) rl.textContent = s.recycleAt ? fmtClock(left) : (s.recycleMin ? 'en attente' : 'désactivé');
-    const rl2 = $('autoRecycle2');
-    if (rl2) rl2.textContent = s.recycleAt ? fmtClock(left) : (s.recycleMin ? 'en attente' : 'désactivé');
-    const rc = $('autoRecycles');
-    if (rc) rc.textContent = String(s.recycles || 0);
-  } else if (s.recycleAt && liveNow) {
-    // Pas de relance en attente : on affiche le compte à rebours du prochain direct
-    const left = Math.max(0, Math.round((s.recycleAt - Date.now()) / 1000));
-    if (banner) {
-      banner.classList.add('show');
-      $('autoTxt').innerHTML = `Nouveau direct dans <b>${fmtClock(left)}</b>`;
-    }
-  } else {
-    if (banner) banner.classList.remove('show');
-    const next = $('autoNext');
-    if (next) next.textContent = s.enabled ? 'en attente' : 'désactivée';
-    const next2 = $('autoNext2');
-    if (next2) next2.textContent = s.enabled ? 'en attente' : 'désactivée';
-    const c = $('autoCount');
-    if (c) c.textContent = String(s.attempts || 0);
-    const rl = $('autoRecycle');
-    if (rl) rl.textContent = s.recycleMin ? 'en attente' : 'désactivé';
-    const rl2 = $('autoRecycle2');
-    if (rl2) rl2.textContent = s.recycleMin ? 'en attente' : 'désactivé';
-    const rc = $('autoRecycles');
-    if (rc) rc.textContent = String(s.recycles || 0);
-  }
-
-  // État visuel des cartes
-  for (const id of ['cardAuto', 'cardAutoClips']) {
-    const el = $(id);
-    if (el) el.classList.toggle('auto-card-off', !s.enabled);
-  }
-}
-
-/* Mise à jour depuis l'état serveur */
-function syncAutoFromState(state) {
-  if (!state || !state.auto) return;
-  autoState.enabled = state.auto.enabled;
-  autoState.delaySec = state.auto.delaySec;
-  autoState.restartAt = state.auto.restartAt;
-  autoState.attempts = state.auto.attempts || 0;
-  autoState.recycleAt = state.auto.recycleAt || null;
-  autoState.recycleMin = state.auto.recycleMin || 0;
-  autoState.recycles = state.auto.recycles || 0;
-  if ($('recycleDelay') && state.auto.recycleMin !== undefined) {
-    if ($('recycleDelay').value !== String(state.auto.recycleMin)) $('recycleDelay').value = String(state.auto.recycleMin);
-    if ($('recycleDelay2').value !== String(state.auto.recycleMin)) $('recycleDelay2').value = String(state.auto.recycleMin);
-  }
-  if ($('autoEnabled')) $('autoEnabled').checked = state.auto.enabled;
-  if ($('autoEnabled2')) $('autoEnabled2').checked = state.auto.enabled;
-  if ($('autoDelay')) $('autoDelay').value = String(state.auto.delaySec);
-  if ($('autoDelay2')) $('autoDelay2').value = String(state.auto.delaySec);
-  renderAuto();
-}
-
 /* ------------------------------------------------------------------ */
 /* Commande FFmpeg (onglet Réglages)                                  */
 /* ------------------------------------------------------------------ */
@@ -3586,33 +3006,11 @@ renderCommand();
 setupScheduling();
 renderErrors();
 applyRatio();
-wireCamBar();
-wireAutoRestart();
 initRegie();
 
 /* ---- Clips : câblage ---- */
 $('drop').addEventListener('click', () => $('fileInput').click());
 $('fileInput').addEventListener('change', (e) => { uploadFiles(e.target.files); e.target.value = ''; });
-
-$('btnAdopt').addEventListener('click', async () => {
-  const file = ($('adoptInput').value || '').trim();
-  if (!file) { toast('Indique le chemin du fichier sur le serveur'); return; }
-  toast('Analyse du fichier…');
-  try {
-    const r = await fetch('/api/clips/adopt', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ file }),
-    });
-    const d = await r.json();
-    if (d.error) { toast(d.error); return; }
-    $('adoptInput').value = '';
-    toast(d.directPlay
-      ? 'Enregistré · lecture directe, aucun ré-encodage'
-      : 'Enregistré · ré-encodage au premier lancement');
-    log(`Clip enregistré : « ${d.clip.title} » (${fmtTime(d.clip.duration)})`, 'ok');
-    loadClips();
-  } catch { toast('Serveur injoignable'); }
-});
 
 for (const evt of ['dragenter', 'dragover']) {
   $('drop').addEventListener(evt, (e) => { e.preventDefault(); $('drop').classList.add('over'); });
@@ -3693,83 +3091,6 @@ $('permLater').addEventListener('click', () => {
   toast('Tu pourras les donner au moment de démarrer');
 });
 $('permModal').addEventListener('click', (e) => { if (e.target.id === 'permModal') hidePermModal(); });
-
-/* ================================================================== */
-/* SÉCURITÉ : verrouillage de la session                              */
-/* ================================================================== */
-(function wireSecurity() {
-  const overlay = $('lockOverlay');
-
-  function showLock(msg) {
-    if (!overlay) return;
-    overlay.classList.add('show');
-    $('lockMsg').textContent = msg || '';
-    setTimeout(() => { try { $('lockPw').focus(); } catch {} }, 120);
-  }
-
-  async function unlock() {
-    const pw = $('lockPw').value;
-    if (!pw) return;
-    $('lockMsg').textContent = '';
-    try {
-      const r = await fetch('/api/login', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: pw }),
-      });
-      const d = await r.json().catch(() => ({}));
-      if (r.ok) { $('lockPw').value = ''; overlay.classList.remove('show'); location.reload(); return; }
-      $('lockMsg').textContent = d.error || 'Mot de passe incorrect.';
-    } catch {
-      $('lockMsg').textContent = 'Serveur injoignable.';
-    }
-  }
-
-  if ($('lockOk')) $('lockOk').addEventListener('click', unlock);
-  if ($('lockPw')) $('lockPw').addEventListener('keydown', (e) => { if (e.key === 'Enter') unlock(); });
-
-  // Toute réponse 401 de l'API réaffiche l'écran de verrouillage
-  const origFetch = window.fetch.bind(window);
-  window.fetch = async (...args) => {
-    const r = await origFetch(...args);
-    if (r.status === 401) {
-      let isAuthCall = false;
-      try {
-        const u = String(typeof args[0] === 'string' ? args[0] : args[0].url || '');
-        isAuthCall = u.includes('/api/login') || u.includes('/api/logout');
-      } catch {}
-      if (!isAuthCall) showLock('Session expirée : entre le mot de passe pour continuer.');
-    }
-    return r;
-  };
-
-  if ($('btnLock')) {
-    $('btnLock').addEventListener('click', async () => {
-      try { await fetch('/api/logout', { method: 'POST' }); } catch {}
-      showLock('');
-      log('Session verrouillée.', 'warn');
-    });
-  }
-
-  if ($('btnChangePw')) {
-    $('btnChangePw').addEventListener('click', async () => {
-      const current = $('pwCurrent').value;
-      const next = $('pwNext').value;
-      if (!current || !next) { toast('Remplis les deux champs'); return; }
-      if (next.length < 6) { toast('6 caractères minimum'); return; }
-      try {
-        const r = await fetch('/api/auth/password', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ current, next }),
-        });
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) { toast(d.error || 'Modification impossible'); return; }
-        $('pwCurrent').value = ''; $('pwNext').value = '';
-        toast('Mot de passe modifié');
-        log('Mot de passe de la page modifié.', 'ok');
-      } catch { toast('Serveur injoignable'); }
-    });
-  }
-})();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a566669a4f27791b',t:'MTc5Mzk5MjI1Mg=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a566669a4f27791b',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a566ea1fad151f7e',t:'MTc5Mzk5NzYzOQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a566ea1fad151f7e',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
