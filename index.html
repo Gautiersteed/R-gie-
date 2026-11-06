@@ -1186,6 +1186,10 @@
 </div>
 
 <script>
+/* Retour de connexion Google : on lit le fragment tout de suite,
+   car le routeur d'onglets remet le # à zéro ensuite. */
+window.__OAUTH_RAW = (location.hash || '').replace(/^#/, '');
+
 'use strict';
 
 /* ------------------------------------------------------------------ */
@@ -2828,9 +2832,23 @@ function initRegie() {
 
     /* Retour de la connexion Google en mode redirection :
        le jeton arrive dans le fragment de l'URL (#access_token=…). */
-    (function handleOAuthRedirectBack() {
-      const raw = (location.hash || '').replace(/^#/, '') || (location.search || '').replace(/^\?/, '');
-      if (!raw || !/access_token=|error=/.test(raw)) return;
+    setTimeout(function handleOAuthRedirectBack() {
+      const raw = window.__OAUTH_RAW || (location.hash || '').replace(/^#/, '');
+      if (!raw || !/access_token=|error=/.test(raw)) {
+        // On revient d'une tentative de connexion mais sans jeton :
+        // Google n'a pas rappelé la page (URI non autorisée sur ce client).
+        let tried = 0;
+        try {
+          tried = Number(sessionStorage.getItem('oauthPending') || 0);
+          if (tried) sessionStorage.removeItem('oauthPending');
+        } catch {}
+        if (tried) {
+          const uri = (() => { try { return sessionStorage.getItem('oauthRedirectUri') || (location.origin + '/'); } catch { return location.origin + '/'; } })();
+          regieLog('❌ Google n\'a pas renvoyé de jeton. Vérifie dans Google Cloud → Identifiants → '
+            + 'URI de redirection autorisés, la présence exacte de : ' + uri);
+        }
+        return;
+      }
       const p = new URLSearchParams(raw);
       const err = p.get('error');
       const tok = p.get('access_token');
@@ -2840,35 +2858,62 @@ function initRegie() {
       try { history.replaceState(null, '', location.pathname); } catch {}
 
       if (err) {
-        regieLog('❌ Connexion refusée : ' + (p.get('error_description') || err));
+        const uri = (() => { try { return sessionStorage.getItem('oauthRedirectUri') || (location.origin + '/'); } catch { return location.origin + '/'; } })();
+        if (err === 'redirect_uri_mismatch' || err === 'invalid_request') {
+          regieLog('❌ Google refuse l\'adresse de retour. Dans Google Cloud → Identifiants → ton client OAuth → '
+            + '« URI de redirection autorisés », ajoute EXACTEMENT : ' + uri + '  (sans slash de plus, sans astérisque)');
+        } else if (err === 'access_denied') {
+          regieLog('❌ Autorisation refusée sur l\'écran Google. Recommence et clique sur « Autoriser ».');
+        } else {
+          regieLog('❌ Connexion refusée : ' + (p.get('error_description') || err));
+        }
         return;
       }
+      regieLog('Retour de Google reçu, jeton récupéré.', 'info');
       const granted = p.get('scope') || '';
       if (granted && !granted.includes('youtube')) {
         regieLog('❌ Autorisation YouTube manquante. Reconnectez-vous en cochant la case YouTube.');
         return;
       }
+      try { sessionStorage.removeItem('oauthPending'); } catch {}
       accessToken = tok;
       const exp = Number(p.get('expires_in')) || 3600;
       expiresAt = Date.now() + Math.max(0, exp - 60) * 1000;
       authPending = false;
       refreshAuthUI();
       regieLog('✅ Connecté à Google. Vous pouvez vérifier votre direct ou enregistrer ses horaires.');
-    })();
+    }, 1200);
 
     function handleAuthClick() {
       try {
         if (!['https:', 'http:'].includes(location.protocol)) {
           throw new Error('Hébergez la page en HTTP(S) pour utiliser la connexion Google.');
         }
-        if (!(window.google && window.google.accounts && window.google.accounts.oauth2)) {
-          throw new Error('Le module Google n\'est pas chargé. Vérifiez Internet ou votre bloqueur, puis réessayez.');
-        }
         const id = $r('clientIdInput').value.trim();
         if (!/^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(id)) {
           throw new Error('L\'ID client OAuth doit se terminer par .apps.googleusercontent.com.');
         }
         saveField($r('clientIdInput'));
+
+        /* ---- Connexion par redirection directe -------------------------
+           On n'utilise plus la fenêtre surgissante de Google : sur Android
+           elle est bloquée (erreur « popup_closed »). On construit l'URL
+           d'autorisation nous-mêmes et on redirige la page. */
+        const redirectUri = location.origin + '/';
+        const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth'
+          + '?client_id=' + encodeURIComponent(id)
+          + '&redirect_uri=' + encodeURIComponent(redirectUri)
+          + '&response_type=token'
+          + '&scope=' + encodeURIComponent(scope)
+          + '&include_granted_scopes=true'
+          + '&prompt=consent';
+        try {
+          sessionStorage.setItem('oauthPending', '1');
+          sessionStorage.setItem('oauthRedirectUri', redirectUri);
+        } catch {}
+        regieLog('Redirection vers Google… (adresse de retour : ' + redirectUri + ')');
+        location.href = authUrl;
+        return;
 
         if (!tokenClient || oauthClientId !== id) {
           clearAuth();
@@ -2879,7 +2924,11 @@ function initRegie() {
             // Sur mobile, la fenêtre surgissante est souvent bloquée
             // (erreur « popup_closed »). Le mode redirection revient sur la
             // page avec le jeton dans l'URL : beaucoup plus fiable.
-            ux_mode: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'redirect' : 'popup',
+            ux_mode: (() => {
+              const m = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'redirect' : 'popup';
+              try { sessionStorage.setItem('oauthUxMode', m); } catch {}
+              return m;
+            })(),
             callback: (response) => {
               authPending = false;
               if (response.error || !response.access_token) {
@@ -2905,6 +2954,7 @@ function initRegie() {
           });
         }
         authPending = true;
+        try { sessionStorage.setItem('oauthPending', String(Date.now())); } catch {}
         refreshAuthUI();
         tokenClient.requestAccessToken({ prompt: 'consent' });
       } catch (error) {
@@ -3721,5 +3771,5 @@ $('permModal').addEventListener('click', (e) => { if (e.target.id === 'permModal
   }
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a56609a88d14cddf',t:'MTc5Mzk4ODQ0NQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a56609a88d14cddf',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a566669a4f27791b',t:'MTc5Mzk5MjI1Mg=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a566669a4f27791b',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
