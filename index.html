@@ -180,6 +180,15 @@
   .badge.warn{background:rgba(217,119,6,.1);color:var(--warn);border-color:rgba(217,119,6,.25)}
   .switch{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--txt-muted);cursor:pointer}
   .switch input{width:auto;accent-color:var(--accent2);width:18px;height:18px}
+  .cam-bar{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 6px}
+  .cam-bar .cam-btn{display:flex;align-items:center;justify-content:center;gap:7px;
+    padding:13px 10px;font:inherit;font-size:13px;font-weight:700;border-radius:12px;
+    border:1px solid var(--line2);background:#fff;color:var(--txt);cursor:pointer}
+  .cam-bar .cam-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+  .cam-bar .cam-btn[aria-pressed="false"]{background:var(--panel3);color:var(--dim);border-style:dashed}
+  .cam-bar .cam-btn[aria-pressed="false"] span::after{content:" · coupé";font-weight:600}
+  .cam-bar .cam-btn.danger{grid-column:1 / -1;color:var(--err);border-color:#fecaca;background:#fff5f5}
+  .cam-bar .cam-btn:disabled{opacity:.45}
   #lockOverlay{position:fixed;inset:0;background:rgba(255,255,255,.98);z-index:9999;
     display:none;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(6px)}
   #lockOverlay.show{display:flex}
@@ -604,6 +613,25 @@
         </div>
         <div class="ov-stats" id="ovStats"></div>
       </div>
+    </div>
+
+    <div class="cam-bar" id="camBar">
+      <button class="cam-btn" id="btnCamToggle" aria-pressed="true">
+        <svg viewBox="0 0 24 24"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        <span id="camLbl">Caméra active</span>
+      </button>
+      <button class="cam-btn" id="btnMicToggle" aria-pressed="true">
+        <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8"/></svg>
+        <span id="micLbl">Micro actif</span>
+      </button>
+      <button class="cam-btn danger" id="btnCamOff">
+        <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        <span>Tout couper</span>
+      </button>
+    </div>
+    <div class="hint" id="camBarHint" style="margin:-6px 0 12px">
+      Ces boutons coupent <b>vraiment</b> la caméra et le micro du téléphone : la lumière s'éteint
+      et plus rien n'est capturé, même si l'onglet reste ouvert.
     </div>
 
     <div class="actions">
@@ -1525,6 +1553,10 @@ async function openCamera() {
   closeCamera();
   const stream = await navigator.mediaDevices.getUserMedia(constraints);
   state.stream = stream;
+  camCtl.camOn = true;
+  const a0 = stream.getAudioTracks()[0];
+  if (a0 && !camCtl.micOn) a0.enabled = false;
+  setTimeout(paintCamBar, 0);
 
   const v = $('preview');
   v.srcObject = stream;
@@ -1533,6 +1565,7 @@ async function openCamera() {
   v.addEventListener('playing', () => v.classList.add('ready'), { once: true });
   $('placeholder').style.display = 'none';
   paintPermButton();
+  paintCamBar();
   $('previewWarn').classList.remove('show');
 
   const t = stream.getVideoTracks()[0];
@@ -1550,6 +1583,117 @@ async function openCamera() {
   await enumerateDevices();
   detectMime();
   return stream;
+}
+
+/* ------------------------------------------------------------------ */
+/* Caméra & micro : couper / reprendre réellement les périphériques   */
+/* ------------------------------------------------------------------ */
+const camCtl = { camOn: true, micOn: true, suspended: false };
+
+function camTracks() {
+  const st = state.stream;
+  if (!st) return { video: null, audio: null };
+  return { video: st.getVideoTracks()[0] || null, audio: st.getAudioTracks()[0] || null };
+}
+
+function wireCamBar() {
+  if (!$('btnCamToggle')) return;
+  $('btnCamToggle').addEventListener('click', toggleCamera);
+  $('btnMicToggle').addEventListener('click', () => muteMic(false));
+  $('btnCamOff').addEventListener('click', cameraOffAll);
+  paintCamBar();
+
+  // Quand l'onglet repasse au premier plan et que rien ne diffuse,
+  // on ne rallume pas la caméra tout seul.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') paintCamBar();
+  });
+}
+
+function paintCamBar() {
+  const bar = $('camBar');
+  if (!bar) return;
+  bar.style.display = 'grid';
+  const cam = $('btnCamToggle'), mic = $('btnMicToggle'), off = $('btnCamOff');
+  if (!cam) return;
+  cam.setAttribute('aria-pressed', String(camCtl.camOn ? 'true' : 'false'));
+  mic.setAttribute('aria-pressed', String(camCtl.micOn ? 'true' : 'false'));
+  $('camLbl').textContent = camCtl.camOn ? 'Caméra active' : 'Caméra';
+  $('micLbl').textContent = camCtl.micOn ? 'Micro actif' : 'Micro';
+  off.disabled = !state.stream && !camCtl.camOn;
+  // Le direct ne peut pas continuer sans image : on désactive le démarrage
+  if ($('btnStart') && !state.recording) $('btnStart').disabled = !camCtl.camOn;
+}
+
+/** Coupe ou rétablit la caméra (libère la lumière du capteur). */
+async function toggleCamera() {
+  if (!state.stream) {
+    // Aucun flux ouvert : le bouton sert à rallumer la caméra
+    try {
+      await openCamera();
+      camCtl.camOn = true;
+      if (!camCtl.micOn) muteMic(true);
+      log('Caméra réactivée.', 'ok');
+    } catch (e) {
+      log('Impossible d’ouvrir la caméra : ' + e.message, 'error');
+      toast('Caméra indisponible');
+    }
+    paintCamBar();
+    return;
+  }
+  if (camCtl.camOn) {
+    if (state.recording) { toast('Coupe le direct avant de couper la caméra'); return; }
+    closeCamera();                     // libère vraiment le périphérique
+    camCtl.camOn = false;
+    $('placeholder').style.display = '';
+    $('resInfo').textContent = 'caméra coupée';
+    log('Caméra coupée : le capteur est libéré (voyant éteint).', 'warn');
+    paintCamBar();
+    return;
+  }
+  try {
+    await openCamera();                // redemande l'accès
+    camCtl.camOn = true;
+    if (!camCtl.micOn) muteMic(true);
+    log('Caméra réactivée.', 'ok');
+  } catch (e) {
+    log('Impossible de rouvrir la caméra : ' + e.message, 'error');
+  }
+  paintCamBar();
+}
+
+/** Coupe ou rétablit le micro (la piste reste ouverte mais devient muette). */
+function muteMic(forceMute) {
+  const { audio } = camTracks();
+  const wantOn = forceMute ? false : !camCtl.micOn;
+  if (audio) audio.enabled = wantOn;
+  camCtl.micOn = wantOn;
+  if (!wantOn) log('Micro coupé.', 'warn'); else log('Micro réactivé.', 'ok');
+  paintCamBar();
+}
+
+/** Coupe les deux d'un coup. */
+function cameraOffAll() {
+  if (state.recording) { toast('Coupe le direct avant de tout couper'); return; }
+  closeCamera();
+  camCtl.camOn = false;
+  camCtl.micOn = false;
+  $('placeholder').style.display = '';
+  $('resInfo').textContent = 'caméra et micro coupés';
+  log('Caméra et micro coupés : plus aucune capture.', 'warn');
+  paintCamBar();
+}
+
+/* Quand le direct s'arrête, on ne laisse pas la caméra tourner pour rien. */
+function releaseCameraIfIdle() {
+  if (state.recording) return;
+  if (!state.stream) return;
+  if (document.visibilityState === 'visible' && liveState && liveState.live) return;
+  closeCamera();
+  camCtl.camOn = false;
+  $('placeholder').style.display = '';
+  log('Direct terminé : caméra libérée automatiquement.', 'info');
+  paintCamBar();
 }
 
 function closeCamera() {
@@ -1751,6 +1895,9 @@ function stopEverything(reason, silent) {
   clearInterval(state.timerId);
   clearInterval(state.rateTimer);
   state.recording = false;
+
+  // On ne laisse pas la caméra tourner dans le vide après le direct
+  setTimeout(releaseCameraIfIdle, 400);
 
   const rec = state.recorder;
   state.recorder = null;
@@ -2679,6 +2826,36 @@ function initRegie() {
 
     function clearAuth() { accessToken = ''; expiresAt = 0; refreshAuthUI(); }
 
+    /* Retour de la connexion Google en mode redirection :
+       le jeton arrive dans le fragment de l'URL (#access_token=…). */
+    (function handleOAuthRedirectBack() {
+      const raw = (location.hash || '').replace(/^#/, '') || (location.search || '').replace(/^\?/, '');
+      if (!raw || !/access_token=|error=/.test(raw)) return;
+      const p = new URLSearchParams(raw);
+      const err = p.get('error');
+      const tok = p.get('access_token');
+      if (!err && !tok) return;
+
+      // On nettoie l'URL : le jeton ne doit pas rester visible ni dans l'historique
+      try { history.replaceState(null, '', location.pathname); } catch {}
+
+      if (err) {
+        regieLog('❌ Connexion refusée : ' + (p.get('error_description') || err));
+        return;
+      }
+      const granted = p.get('scope') || '';
+      if (granted && !granted.includes('youtube')) {
+        regieLog('❌ Autorisation YouTube manquante. Reconnectez-vous en cochant la case YouTube.');
+        return;
+      }
+      accessToken = tok;
+      const exp = Number(p.get('expires_in')) || 3600;
+      expiresAt = Date.now() + Math.max(0, exp - 60) * 1000;
+      authPending = false;
+      refreshAuthUI();
+      regieLog('✅ Connecté à Google. Vous pouvez vérifier votre direct ou enregistrer ses horaires.');
+    })();
+
     function handleAuthClick() {
       try {
         if (!['https:', 'http:'].includes(location.protocol)) {
@@ -2699,6 +2876,10 @@ function initRegie() {
           tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: id,
             scope,
+            // Sur mobile, la fenêtre surgissante est souvent bloquée
+            // (erreur « popup_closed »). Le mode redirection revient sur la
+            // page avec le jeton dans l'URL : beaucoup plus fiable.
+            ux_mode: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'redirect' : 'popup',
             callback: (response) => {
               authPending = false;
               if (response.error || !response.access_token) {
@@ -3355,6 +3536,7 @@ renderCommand();
 setupScheduling();
 renderErrors();
 applyRatio();
+wireCamBar();
 wireAutoRestart();
 initRegie();
 
@@ -3539,5 +3721,5 @@ $('permModal').addEventListener('click', (e) => { if (e.target.id === 'permModal
   }
 })();
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a56609a88d14cddf',t:'MTc5Mzk4ODQ0NQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a56609a88d14cddf',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
