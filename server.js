@@ -498,6 +498,7 @@ function attachProcess(proc, opts) {
   live.loops = 0;
   live.stopping = false;
   live.lastStats = null;
+  live.lastProgressAt = Date.now();
 
   proc.stderr.on('data', (d) => {
     live.stderrBuf += d.toString();
@@ -512,6 +513,7 @@ function attachProcess(proc, opts) {
         const stat = parseProgress(line);
         if (stat) {
           live.lastStats = stat;
+          live.lastProgressAt = Date.now();
           broadcast({ type: 'stats', ...stat, uptime: uptime() });
         }
       } else if (/Input #0|Output #0|Stream mapping|Opening|Successfully opened|looping/i.test(line)) {
@@ -570,6 +572,7 @@ function attachProcess(proc, opts) {
     };
     live.auto.lastMode = wasMode;
     live.auto.lastClipId = live.clipId;
+    live.auto.lastOptions = { ...(lastSession.options || {}) };
 
     live.mode = null;
     live.clipId = null;
@@ -771,6 +774,210 @@ function mailConf() {
 function mailReady() {
   const c = mailConf();
   return Boolean(c.GMAIL_USER && c.GMAIL_APP_PASSWORD && c.MAIL_TO);
+}
+
+/* ================================================================== */
+/* Surveillance 24/7, embarquée dans le serveur (aucun cron requis)    */
+/* ================================================================== */
+
+const COMMANDE_SYSTEMD = "sudo mkdir -p /etc/systemd/system/live-encoder.service.d && "
+  + "sudo printf '[Service]\\nRestart=always\\nRestartSec=5\\nStartLimitIntervalSec=0\\nTimeoutStopSec=20\\n' "
+  + "> /etc/systemd/system/live-encoder.service.d/restart.conf && sudo systemctl daemon-reload && "
+  + "sudo systemctl restart live-encoder && sleep 3 && systemctl is-active live-encoder";
+
+const WATCH = {
+  intervalle: 5 * 60 * 1000,
+  dernierPassage: 0,
+  actions: [],
+  dernierDisque: null,
+  systemdOk: null,
+  heureRapport: 8,
+  dernierRapport: '',
+  gelAlerte: 0,
+  dernierRappelSystemd: 0,
+};
+
+function noterAction(txt) {
+  WATCH.actions.push({ at: Date.now(), txt });
+  if (WATCH.actions.length > 60) WATCH.actions.shift();
+  logAll('info', 'Surveillance : ' + txt);
+}
+
+function pourcentDisque() {
+  const r = spawnSync('df', ['-P', '/'], { encoding: 'utf8' });
+  if (r.status !== 0 || !r.stdout) return null;
+  const lignes = r.stdout.trim().split('\n');
+  const cols = (lignes[lignes.length - 1] || '').split(/\s+/);
+  const v = parseInt(String(cols[4] || '').replace('%', ''), 10);
+  return Number.isFinite(v) ? v : null;
+}
+
+function espaceLibre(octets) {
+  return fmtBytes(octets);
+}
+
+function supprimerVieux(dossier, motif, jours, label) {
+  let n = 0, libere = 0;
+  try {
+    const lim = Date.now() - jours * 86400000;
+    for (const f of fs.readdirSync(dossier)) {
+      if (motif && !motif.test(f)) continue;
+      const fp = path.join(dossier, f);
+      try {
+        const st = fs.statSync(fp);
+        if (st.isFile() && st.mtimeMs < lim) {
+          libere += st.size; fs.unlinkSync(fp); n++;
+        }
+      } catch {}
+    }
+  } catch {}
+  if (n) noterAction(`${n} fichier(s) ${label} de plus de ${jours} j supprimé(s) (${espaceLibre(libere)})`);
+  return n;
+}
+
+function verifierSystemd(filet) {
+  try {
+    const r = spawnSync('systemctl', ['show', 'live-encoder', '-p', 'Restart', '--value'], { encoding: 'utf8', timeout: 5000 });
+    if (r.status === 0) {
+      const v = (r.stdout || '').trim();
+      if (v === 'always' || v === 'on-failure' || v === 'on-abnormal') { WATCH.systemdOk = true; return; }
+      WATCH.systemdOk = false;
+      const dernierRappel = WATCH.dernierRappelSystemd || 0;
+      if (filet && Date.now() - dernierRappel > 12 * 3600 * 1000) {
+        WATCH.dernierRappelSystemd = Date.now();
+        noterAction('redémarrage après plantage non installé — la commande est dans Réglages → Surveillance');
+        if (mailReady()) sendMail('Surveillance partielle',
+          'La surveillance dans l\'application fonctionne, mais le redémarrage automatique après un plantage du serveur n\'est pas installé.\n\n'
+          + 'Colle cette commande dans la console DigitalOcean, une seule fois :\n\n' + COMMANDE_SYSTEMD);
+      }
+      return;
+    }
+  } catch {}
+  WATCH.systemdOk = null;   // pas de systemd repérable (environnement de test)
+}
+
+function verifierSurveillance(force) {
+  const bilan = [];
+  const dejaFaites = WATCH.actions.length;
+  WATCH.dernierPassage = Date.now();
+
+  // 1. Disque : purge avant de crier
+  const pct = pourcentDisque();
+  WATCH.dernierDisque = pct;
+  if (pct !== null) {
+    if (pct >= 90) {
+      const avant = dossierTaille(CACHE_DIR);
+      supprimerVieux(CACHE_DIR, /\.mp4$/, 0, 'du cache');
+      const apres = dossierTaille(CACHE_DIR);
+      bilan.push(`disque à ${pct} % → cache vidé (${espaceLibre(avant)} → ${espaceLibre(apres)})`);
+      noterAction(bilan[bilan.length - 1]);
+      if (mailReady()) sendMail('Disque presque plein (' + pct + ' %)',
+        'Le disque du serveur est à ' + pct + ' %. Les fichiers de conversion ont été supprimés.\n\n'
+        + 'Si le message revient, supprime un vieux clip dans l\'application : Clips → corbeille.');
+    } else if (pct >= 80) {
+      noterAction('disque à ' + pct + ' % (surveillé)');
+    }
+  }
+
+  // 2. Diffusion figée : FFmpeg vivant mais aucune image depuis 10 min
+  if (live.proc && !live.recycling) {
+    const dernier = live.lastProgressAt || live.startedAt || Date.now();
+    const minutes = Math.round((Date.now() - dernier) / 60000);
+    if (minutes >= 10) {
+      bilan.push(`diffusion figée depuis ${minutes} min → relance`);
+      noterAction(bilan[bilan.length - 1]);
+      if (mailReady()) sendMail('Diffusion figée — relancée',
+        'La diffusion ne produisait plus rien depuis ' + minutes + ' minutes. Le flux a été coupé pour être relancé automatiquement.');
+      WATCH.gelAlerte++;
+      try { live.proc.kill('SIGKILL'); } catch {}
+    } else if (live.lastStats && minutes >= 3) {
+      noterAction('diffusion lente (aucune image depuis ' + minutes + ' min, surveillance en cours)');
+    }
+  }
+
+  // 3. Nettoyages périodiques
+  supprimerVieux(CACHE_DIR, /\.part/, 7, 'temporaires');
+  supprimerVieux(CACHE_DIR, /\.mp4$/, 1, 'du cache');
+  supprimerVieux(REC_DIR, /\.(mp4|mkv|webm|mov)$/, 3, 'd\'enregistrement');
+
+  // 4. Fichier de clip disparu alors que la diffusion tourne
+  if (live.proc && live.clipId) {
+    const c = clips.get(live.clipId);
+    if (c && c.file && !fs.existsSync(clipPath(c))) {
+      bilan.push('fichier du clip « ' + c.title + ' » introuvable pendant la diffusion');
+      noterAction(bilan[bilan.length - 1]);
+      if (mailReady()) sendMail('Clip introuvable', 'Le fichier du clip « ' + c.title + ' » a disparu du serveur pendant la diffusion.');
+    }
+  }
+
+  // 5. Redémarrage après plantage (rappel au maximum 2 fois par jour)
+  verifierSystemd(true);
+
+  // 6. Rapport du matin
+  const h = new Date().getHours();
+  const jour = new Date().toISOString().slice(0, 10);
+  if (h >= WATCH.heureRapport && h < WATCH.heureRapport + 3 && WATCH.dernierRapport !== jour) {
+    WATCH.dernierRapport = jour;
+    if (mailReady()) {
+      sendMail('Rapport quotidien — ' + (live.proc ? 'EN DIRECT' : 'à l\'arrêt'),
+        'État du serveur ce matin.\n\n'
+        + 'Service     : actif depuis ' + Math.round(process.uptime() / 60) + ' min\n'
+        + 'Diffusion   : ' + (live.proc ? 'EN DIRECT (' + ((clips.get(live.clipId) || {}).title || '?') + ')' : 'à l\'arrêt') + '\n'
+        + 'Clips       : ' + clips.size + '\n'
+        + 'Disque      : ' + (pct === null ? '?' : pct + ' %') + '\n'
+        + 'Réparations : ' + (WATCH.actions.length ? WATCH.actions.slice(-3).map((a) => '- ' + a.txt).join('\n              ') : 'aucune') + '\n\n'
+        + 'Rien à faire de ton côté : ce message confirme que la chaîne complète fonctionne.');
+      noterAction('rapport quotidien envoyé');
+    }
+  }
+
+  const nouvelles = WATCH.actions.slice(dejaFaites).map((a) => a.txt);
+  const total = [...bilan, ...nouvelles.filter((t) => !bilan.some((b) => b.startsWith(t.slice(0, 25))))];
+  if (total.length) logAll('info', 'Surveillance terminée : ' + total.join(' · '));
+  return total;
+}
+
+function dossierTaille(dir) {
+  let t = 0;
+  try {
+    for (const f of fs.readdirSync(dir)) {
+      try { const st = fs.statSync(path.join(dir, f)); if (st.isFile()) t += st.size; } catch {}
+    }
+  } catch {}
+  return t;
+}
+
+function texteDiagnostic() {
+  const l = [];
+  const pousser = (k, v) => l.push(k.padEnd(16) + ': ' + v);
+  pousser('Version', 'v5.5 (serveur ' + fs.statSync(__filename).size + ' o)');
+  pousser('Node', process.version);
+  pousser('Système', os.platform() + ' ' + os.release() + ' (' + os.arch() + ')');
+  pousser('Démarrage', new Date(Date.now() - process.uptime() * 1000).toLocaleString('fr-FR'));
+  pousser('Durée', Math.round(process.uptime() / 60) + ' min');
+  pousser('Mémoire', Math.round((1 - os.freemem() / os.totalmem()) * 100) + ' % de ' + fmtBytes(os.totalmem()));
+  pousser('Charge', os.loadavg().map((x) => x.toFixed(2)).join(' / '));
+  pousser('Disque', WATCH.dernierDisque === null ? '?' : WATCH.dernierDisque + ' %');
+  pousser('FFmpeg', binOk(FFMPEG) ? 'présent' : 'ABSENT');
+  pousser('yt-dlp', ytdlp() ? 'présent' : 'absent');
+  pousser('Direct', live.proc ? 'EN DIRECT — ' + ((clips.get(live.clipId) || {}).title || '?') + ' (' + uptime() + ' s)' : 'à l\'arrêt');
+  if (live.lastStats) pousser('Images', live.lastStats.frame + ' @ ' + live.lastStats.fps + ' i/s ' + live.lastStats.bitrate);
+  pousser('Relance auto', live.auto.enabled ? 'activée' : 'désactivée');
+  pousser('Prochain départ', live.auto.restartAt ? new Date(live.auto.restartAt).toLocaleString('fr-FR') : '—');
+  pousser('Clips', clips.size + ' (' + espaceLibre(dossierTaille(CLIPS_DIR)) + ')');
+  pousser('Cache', espaceLibre(dossierTaille(CACHE_DIR)));
+  pousser('Google', fs.existsSync(path.join(DATA_DIR, 'yt-token.json')) ? 'autorisé' : 'NON autorisé');
+  pousser('Alerte mail', mailReady() ? (mailConf().MAIL_TO || 'configurée') : 'non configurée');
+  pousser('Surveillance', 'dernier contrôle ' + (WATCH.dernierPassage ? new Date(WATCH.dernierPassage).toLocaleTimeString('fr-FR') : '—'));
+  pousser('Redémarrage', WATCH.systemdOk === true ? 'après plantage : installé' : (WATCH.systemdOk === false ? 'après plantage : NON installé' : 'inconnu (pas de systemd)'));
+  l.push('');
+  l.push('DERNIÈRES RÉPARATIONS');
+  if (WATCH.actions.length) for (const a of WATCH.actions.slice(-8)) l.push('  ' + new Date(a.at).toLocaleTimeString('fr-FR') + '  ' + a.txt);
+  else l.push('  aucune');
+  l.push('');
+  l.push('40 DERNIÈRES LIGNES DU JOURNAL');
+  for (const e of logRing.items.slice(-40)) l.push('  ' + new Date(e.t).toLocaleTimeString('fr-FR') + '  ' + e.level + '  ' + e.message);
+  return l.join('\n');
 }
 
 function sendMail(subject, body) {
@@ -1937,6 +2144,32 @@ const server = http.createServer(async (req, res) => {
     }
 
     /* ---------- YouTube : configuration OAuth ---------- */
+    /* ---------- Surveillance intégrée ---------- */
+    if (p === '/api/surveillance') {
+      return json(res, 200, {
+        actif: true,
+        dernierPassage: WATCH.dernierPassage,
+        prochain: WATCH.dernierPassage + WATCH.intervalle,
+        intervalle: WATCH.intervalle,
+        reparations: WATCH.actions.slice(-12),
+        disque: WATCH.dernierDisque,
+        systemdOk: WATCH.systemdOk,
+        commandeSystemd: COMMANDE_SYSTEMD,
+        rapportQuotidien: WATCH.heureRapport,
+        mail: mailReady(),
+        uptime: uptime(),
+      });
+    }
+
+    if (p === '/api/surveillance/forcer' && req.method === 'POST') {
+      const bilan = verifierSurveillance(true);
+      return json(res, 200, { ok: true, bilan, systemdOk: WATCH.systemdOk });
+    }
+
+    if (p === '/api/diagnostic') {
+      return json(res, 200, { texte: texteDiagnostic() });
+    }
+
     if (p === '/api/mail/status') {
       const c = mailConf();
       return json(res, 200, {
@@ -2596,6 +2829,19 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`   yt-dlp : ${ytdlp() ? 'disponible' : 'absent (upload uniquement)'}`);
   console.log(`   accès  : protégé par mot de passe (${auth.source === 'env' ? 'ENCODER_PASSWORD' : 'data/auth.json'})\n`);
   restoreState();
+
+  // Surveillance 24/7 embarquée : premier contrôle 60 s après le démarrage,
+  // puis toutes les 5 minutes. Aucun cron, aucun script externe.
+  setTimeout(() => {
+    try { verifierSurveillance(false); } catch (e) { logAll('error', 'Surveillance : ' + e.message); }
+    setInterval(() => {
+      try { verifierSurveillance(false); } catch (e) { logAll('error', 'Surveillance : ' + e.message); }
+    }, WATCH.intervalle);
+  }, 60000);
+  if (WATCH.systemdOk === null) verifierSystemd(false);
+  setTimeout(() => verifierSystemd(false), 15000);
+  console.log('🛡️  Surveillance intégrée : contrôle toutes les 5 min, alerte e-mail '
+    + (mailReady() ? 'activée' : 'non configurée'));
 
   // Filet de sécurité : arrêt auto même après un redémarrage
   setInterval(() => {
