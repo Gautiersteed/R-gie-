@@ -1828,7 +1828,7 @@ const server = http.createServer(async (req, res) => {
     /* ---------- Authentification : portillon ---------- */
     // /oauth/start exige la session (le lien est cliqué depuis la page protégée) ;
     // seul le retour de Google doit être joignable sans cookie.
-    const publicRoutes = new Set(['/login', '/api/login', '/oauth/callback']);
+    const publicRoutes = new Set(['/login', '/api/login', '/oauth/callback', '/health']);
     const session = getSession(req);
 
     if (p === '/api/login' && req.method === 'POST') {
@@ -1988,10 +1988,14 @@ const server = http.createServer(async (req, res) => {
 
     /* ---------- API ---------- */
     if (p === '/health') {
+      // Volontairement minimal et public : sert au chien de garde (auto-repare.sh).
       return json(res, 200, {
-        ok: true, ffmpeg: binOk(FFMPEG), ytdlp: ytdlp(),
-        clips: clips.size, uptime: Math.round(process.uptime()),
-        live: publicState(),
+        ok: true,
+        ffmpeg: binOk(FFMPEG),
+        clips: clips.size,
+        live: Boolean(live.proc),
+        auto: Boolean(live.auto.enabled),
+        uptime: Math.round(process.uptime()),
       });
     }
 
