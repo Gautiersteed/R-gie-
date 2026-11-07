@@ -202,11 +202,31 @@ const live = {
     recycles: 0,       // nombre de recyclages enchaînés
   },
   recycling: false,    // true pendant une coupure volontaire
+  starting: false,     // true pendant une préparation (empêche les doubles départs)
 };
 
 /* ------------------------------------------------------------------ */
 /* Relance automatique                                                 */
 /* ------------------------------------------------------------------ */
+
+function saveAutoSettings() {
+  writeJsonFile(SETTINGS_FILE, {
+    enabled: live.auto.enabled,
+    delaySec: live.auto.delaySec,
+    recycleMin: live.auto.recycleMin,
+    autoBroadcast: Boolean(live.auto.autoBroadcast),
+  });
+}
+
+function loadAutoSettings() {
+  const d = readJsonFile(SETTINGS_FILE);
+  if (!d) return;
+  if (d.enabled !== undefined) live.auto.enabled = Boolean(d.enabled);
+  if (d.delaySec !== undefined) live.auto.delaySec = Math.max(5, Math.min(3600, Number(d.delaySec) || 15));
+  if (d.recycleMin !== undefined) live.auto.recycleMin = Math.max(0, Math.min(1440, Number(d.recycleMin) || 0));
+  if (d.autoBroadcast !== undefined) live.auto.autoBroadcast = Boolean(d.autoBroadcast);
+  console.log(`✓ Réglages relance : ${live.auto.enabled ? 'activée' : 'désactivée'} · délai ${live.auto.delaySec} s · renouvellement ${live.auto.recycleMin} min`);
+}
 
 function autoCancel(reason) {
   if (live.auto.timer) { clearTimeout(live.auto.timer); live.auto.timer = null; }
@@ -241,7 +261,16 @@ function autoSchedule(last) {
 
     // Nouveau direct YouTube avant de relancer : c'est ce qui permet
     // d'enchaîner les cycles de 11 h sans aucune intervention.
-    if (live.auto.autoBroadcast && ytReady()) {
+    let clipOk = true;
+    if (last.mode === 'clip') {
+      const c = clips.get(last.clipId);
+      clipOk = Boolean(c && c.file && fs.existsSync(clipPath(c)));
+      if (!clipOk) {
+        logAll('error', 'Le fichier du clip est introuvable : aucun nouveau direct créé.');
+      }
+    }
+
+    if (live.auto.autoBroadcast && ytReady() && clipOk) {
       try {
         const b = await createLiveBroadcast();
         live.auto.lastKey = b.streamKey || live.auto.lastKey;
@@ -259,11 +288,22 @@ function autoSchedule(last) {
       } else {
         startCamera({ ...last.options, streamKey: live.auto.lastKey || live.streamKey, ingest: live.auto.lastIngest || live.ingest });
       }
+      live.auto.failures = 0;
     } catch (e) {
-      logAll('error', 'Relance automatique impossible : ' + e.message);
-      // On retente au prochain cycle plutôt que d'abandonner
-      live.auto.restartAt = Date.now() + delay * 1000;
-      live.auto.timer = setTimeout(() => autoSchedule(last), delay * 1000);
+      live.auto.failures = (live.auto.failures || 0) + 1;
+      // Après 3 échecs d'affilée on s'arrête et on le dit clairement :
+      // sinon le serveur tourne en boucle, crée des directs inutiles et sature le quota.
+      if (live.auto.failures >= 3) {
+        live.auto.enabled = false;
+        live.auto.restartAt = 0;
+        logAll('error', `Relance automatique ARRÊTÉE après 3 échecs : ${e.message}`);
+        logAll('error', 'Corrige la cause (place disque, format, autorisation YouTube) '
+          + 'puis appuie de nouveau sur « Diffuser ».');
+      } else {
+        logAll('error', `Relance automatique impossible (échec ${live.auto.failures}/3) : ${e.message}`);
+        live.auto.restartAt = Date.now() + delay * 1000;
+        live.auto.timer = setTimeout(() => autoSchedule(last), delay * 1000);
+      }
     }
     broadcastState();
   }, delay * 1000);
@@ -539,7 +579,25 @@ function attachProcess(proc, opts) {
     const explicitEnd = wasStopping || live.endReached;
     let scheduled = false;
     if (!explicitEnd && lastSession.mode) {
-      scheduled = autoSchedule(lastSession);
+      const duree = live.startedAt ? (Date.now() - live.startedAt) / 1000 : 0;
+      const mort = !wasRecycling && duree < 20;
+      if (mort) {
+        live.auto.crashStreak = (live.auto.crashStreak || 0) + 1;
+      } else {
+        live.auto.crashStreak = 0;
+      }
+      if (live.auto.crashStreak >= 3) {
+        live.auto.enabled = false;
+        live.auto.crashStreak = 0;
+        live.auto.restartAt = 0;
+        saveAutoSettings();
+        logAll('error', 'Boucle d\'échecs détectée (3 diffusions mortes en moins de 20 s) : '
+          + 'relance automatique ARRÊTÉE.');
+        logAll('error', 'Cause probable : fichier du clip déplacé ou supprimé, disque plein, '
+          + 'format impossible à produire. Vérifie le journal, corrige, puis relance « Diffuser ».');
+      } else {
+        scheduled = autoSchedule(lastSession);
+      }
     }
 
     broadcast({
@@ -671,14 +729,43 @@ function cachePath(clip, opts) {
  */
 const DIRECT_AUDIO = new Set(['aac', 'mp3']);
 
-/** Le clip a-t-il déjà le rapport d'image demandé (à 2 % près) ? */
-function ratioMatches(clip, ratio) {
+/**
+ * Le clip a-t-il déjà le rapport d'image demandé ?
+ * Tolérance 5 % (une vidéo 312x570 = 0,547 est « assez verticale » pour du 9:16),
+ * et on n'agrandit JAMAIS une vidéo : upscaler 11 h pour rien coûte des heures de CPU.
+ */
+function ratioMatches(clip, ratio, opts = {}) {
   if (!ratio || ratio === 'auto') return true;
   const r = RATIOS[ratio];
   if (!r || !clip.width || !clip.height) return true;
   const src = clip.width / clip.height;
   const want = r.w / r.h;
-  return Math.abs(src - want) / want < 0.02;
+  if (Math.abs(src - want) / want < 0.05) return true;
+
+  const preset = PRESETS[opts.preset] || PRESETS['720p30'];
+  const targetH = clamp(Number(opts.height) || preset.height, 144, 1440);
+  if (clip.height < targetH) {
+    logAll('info', `Vidéo ${clip.width}×${clip.height} plus petite que le format visé `
+      + `(${targetH}px de haut) : elle est diffusée telle quelle, sans agrandissement inutile.`);
+    return true;
+  }
+  return false;
+}
+
+function fmtBytes(b) {
+  if (!Number.isFinite(b)) return '∞';
+  const u = ['o', 'Ko', 'Mo', 'Go', 'To'];
+  let i = 0, n = b;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return n.toFixed(n >= 10 || i === 0 ? 0 : 1) + ' ' + u[i];
+}
+
+/** Estimation de la taille du fichier préparé (octets). */
+function estimatePrepareBytes(clip, opts) {
+  const preset = PRESETS[opts.preset] || PRESETS['720p30'];
+  const vbr = clamp(Number(opts.videoBitrate) || preset.vbr, 200, 12000) * 1000;
+  const dur = Math.max(1, (clip.end || clip.duration || 1) - (Number(clip.start) || 0));
+  return Math.round((vbr + 128000) / 8 * dur * 1.05);
 }
 
 function canDirectPlay(clip) {
@@ -710,7 +797,17 @@ function canDirectPlay(clip) {
 
 function prepareClip(clip, opts, out) {
   return new Promise((resolve, reject) => {
-    if (fs.existsSync(out) && fs.statSync(out).size > 1024) return resolve(out);
+    // Un cache existant n'est réutilisé QUE s'il est lisible en entier.
+    // (Avant : un fichier interrompu était pris pour un clip prêt -> « moov atom not found ».)
+    if (fs.existsSync(out) && fs.statSync(out).size > 1024) {
+      try {
+        probe(out);
+        return resolve(out);
+      } catch {
+        try { fs.unlinkSync(out); } catch {}
+        logAll('warn', 'Fichier préparé incomplet détecté : il est supprimé et refait proprement.');
+      }
+    }
 
     const src = clipPath(clip);
     if (!src || !fs.existsSync(src)) return reject(new Error('Fichier du clip absent du disque.'));
@@ -733,19 +830,31 @@ function prepareClip(clip, opts, out) {
       args.push('-map', '0:v:0', '-map', '1:a:0', '-shortest');
     }
     args.push(...encoderArgs(opts));
-    args.push('-movflags', '+faststart', out);
+    // On écrit dans un fichier temporaire : le cache final n'apparaît que complet.
+    const tmp = out.replace(/\.mp4$/i, '') + '.part.mp4';
+    try { fs.unlinkSync(tmp); } catch {}
+    args.push('-movflags', '+faststart', tmp);
 
     const t0 = Date.now();
     const proc = spawn(FFMPEG, args, { stdio: ['ignore', 'ignore', 'pipe'] });
     let err = '';
     proc.stderr.on('data', (d) => { err += d.toString(); });
     proc.on('exit', (code) => {
-      if (code === 0 && fs.existsSync(out)) {
+      if (code === 0 && fs.existsSync(tmp)) {
+        try {
+          probe(tmp);                       // contrôle final avant de publier
+          fs.renameSync(tmp, out);
+        } catch (e) {
+          try { fs.unlinkSync(tmp); } catch {}
+          return reject(new Error('Préparation invalide : ' + e.message));
+        }
         logAll('ok', `Clip prêt en ${((Date.now() - t0) / 1000).toFixed(1)} s · diffusion à coût CPU nul.`);
         resolve(out);
       } else {
-        try { fs.unlinkSync(out); } catch {}
-        reject(new Error('Préparation impossible : ' + (err.trim().split('\n').pop() || 'code ' + code)));
+        try { fs.unlinkSync(tmp); } catch {}
+        const motif = err.trim().split('\n').pop() || ('code ' + code);
+        reject(new Error('Préparation impossible : ' + motif
+          + (/No space left/i.test(err) ? ' — disque plein' : '')));
       }
     });
   });
@@ -758,9 +867,16 @@ function prepareClip(clip, opts, out) {
  * @param {boolean} reloop relance interne après sortie du process
  */
 async function startClip(clipId, options, reloop = false) {
+  if (live.starting) throw new Error('Une préparation est déjà en cours : patiente quelques instants.');
   const clip = clips.get(clipId);
   if (!clip) throw new Error('Clip introuvable.');
   if (!clip.file) throw new Error('Ce clip est un lien : le téléchargement n\'est pas terminé.');
+
+  const src0 = clipPath(clip);
+  if (!src0 || !fs.existsSync(src0)) {
+    throw new Error(`Fichier du clip introuvable sur le serveur (${clip.file || 'chemin absent'}) : `
+      + 'le clip a peut-être été déplacé ou supprimé.');
+  }
 
   const opts = { ...options };
   const key = String(opts.streamKey || live.streamKey || '').trim();
@@ -770,7 +886,7 @@ async function startClip(clipId, options, reloop = false) {
   if (live.proc) throw new Error('Une diffusion est déjà en cours.');
 
   // 1) Préparation / cache — ou lecture directe pour les vidéos déjà conformes
-  const direct = canDirectPlay(clip) && ratioMatches(clip, opts.ratio);
+  const direct = canDirectPlay(clip) && ratioMatches(clip, opts.ratio, opts);
   if (canDirectPlay(clip) && !direct) {
     logAll('info', `Format demandé ${opts.ratio} alors que la vidéo est en `
       + `${clip.width}×${clip.height} : conversion en une passe (peut être long sur une très longue vidéo).`);
@@ -781,7 +897,26 @@ async function startClip(clipId, options, reloop = false) {
     logAll('ok', `Lecture directe de « ${clip.title} » (${clip.videoCodec}/${clip.audioCodec}, `
       + `${clip.width}×${clip.height}) : aucun ré-encodage, aucun fichier temporaire.`);
   } else {
-    prepared = await prepareClip(clip, opts, cachePath(clip, opts));
+    // Place disque : une conversion de plusieurs heures demande plusieurs Go.
+    const besoin = estimatePrepareBytes(clip, opts);
+    let libre = Infinity;
+    try {
+      const st = fs.statfsSync(ROOT);
+      libre = Number(st.bavail) * Number(st.bsize);
+    } catch {}
+    if (libre < besoin * 1.15) {
+      throw new Error(`Conversion impossible : ${fmtBytes(besoin)} nécessaires, `
+        + `${fmtBytes(libre)} libres. Choisis le format « Automatique » `
+        + `ou libère de la place dans /opt/live-encoder/data/cache.`);
+    }
+    logAll('info', `Conversion nécessaire : environ ${fmtBytes(besoin)} de cache `
+      + `pour une vidéo de ${fmtTime(clip.duration)}.`);
+    live.starting = true;
+    try {
+      prepared = await prepareClip(clip, opts, cachePath(clip, opts));
+    } finally {
+      live.starting = false;
+    }
   }
 
   // 2) Montage du flux à partir du fichier préparé
@@ -1219,18 +1354,32 @@ async function ytAccessToken() {
   return tok.access_token;
 }
 
-async function ytApi(pathname, { method = 'GET', query = {}, body = null } = {}) {
+async function ytApi(pathname, { method = 'GET', query = {}, body = null, retry = 2 } = {}) {
   const token = await ytAccessToken();
   const u = new URL('https://www.googleapis.com/youtube/v3/' + pathname);
   for (const [k, v] of Object.entries(query)) u.searchParams.set(k, v);
-  const r = await fetch(u, {
-    method,
-    headers: {
-      Authorization: 'Bearer ' + token,
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
+
+  let r;
+  for (let essai = 0; ; essai++) {
+    try {
+      r = await fetch(u, {
+        method,
+        headers: {
+          Authorization: 'Bearer ' + token,
+          ...(body ? { 'Content-Type': 'application/json' } : {}),
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+        signal: AbortSignal.timeout(25000),   // plus de blocage silencieux
+      });
+      break;
+    } catch (e) {
+      // « fetch failed » : réseau qui hoquette. On réessaie avant d'abandonner.
+      if (essai >= retry) {
+        throw new Error(`réseau indisponible (${e.message}) — réessaie dans un instant`);
+      }
+      await new Promise((r2) => setTimeout(r2, 1500 * (essai + 1)));
+    }
+  }
   const d = await r.json().catch(() => ({}));
   if (!r.ok) {
     const e = d.error || {};
@@ -1244,7 +1393,27 @@ async function ytApi(pathname, { method = 'GET', query = {}, body = null } = {})
  * et renvoie la clé à utiliser. C'est ce qui permet d'enchaîner
  * les cycles de 11 h sans intervention.
  */
+let broadcastLock = null;                 // une création à la fois
+let recentBroadcast = null;               // pour ne pas créer 2 directs en 3 secondes
+
 async function createLiveBroadcast(title) {
+  if (broadcastLock) return broadcastLock;          // appel concurrent : on attend le même
+  if (recentBroadcast && Date.now() - recentBroadcast.at < 3 * 60000) {
+    logAll('info', `Direct récent réutilisé (${Math.round((Date.now() - recentBroadcast.at) / 1000)} s) : `
+      + recentBroadcast.watchUrl);
+    return recentBroadcast;
+  }
+  broadcastLock = createLiveBroadcastNow(title);
+  try {
+    const b = await broadcastLock;
+    recentBroadcast = { ...b, at: Date.now() };
+    return b;
+  } finally {
+    broadcastLock = null;
+  }
+}
+
+async function createLiveBroadcastNow(title) {
   const nom = String(title || ('Diffusion ' + new Date().toLocaleString('fr-FR'))).slice(0, 90);
   const memo = readJsonFile(YT_STREAM_FILE) || {};
 
@@ -1316,6 +1485,7 @@ async function createLiveBroadcast(title) {
 
 const AUTH_FILE = path.join(DATA_DIR, 'auth.json');
 const SESSION_FILE = path.join(DATA_DIR, 'sessions.json');
+const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const COOKIE = 'enc_session';
 
 const auth = {
@@ -1724,6 +1894,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/yt/autobroadcast' && req.method === 'POST') {
       const body = JSON.parse((await readBody(req, 4096)).toString() || '{}');
       live.auto.autoBroadcast = Boolean(body.enabled);
+      saveAutoSettings();
       logAll('info', 'Création automatique du nouveau direct : '
         + (live.auto.autoBroadcast ? 'activée' : 'désactivée') + '.');
       return json(res, 200, { autoBroadcast: live.auto.autoBroadcast });
@@ -2145,6 +2316,7 @@ const server = http.createServer(async (req, res) => {
         live.auto.recycleMin = Math.max(0, Math.min(1440, Number(body.recycleMin) || 0));
         if (live.proc) armRecycle(); else cancelRecycle();
       }
+      saveAutoSettings();
       if (!live.auto.enabled) autoCancel('désactivée');
       // Si une relance est en attente, on applique le nouveau délai immédiatement
       else if (live.auto.restartAt) {
@@ -2291,6 +2463,7 @@ ensureYtdlp();
 initAuth();
 loadSessions();
 loadUploads();
+loadAutoSettings();
 loadLibrary();
 pruneCache();
 
