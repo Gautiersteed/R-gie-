@@ -354,6 +354,30 @@
       <div class="hint" id="mailOut"></div>
     </div>
 
+    <div class="card" id="cardWatch">
+      <h2>Surveillance 24/7 <span id="watchBadge" style="text-transform:none;letter-spacing:0;color:var(--ok)">intégrée</span></h2>
+      <div class="hint" style="margin:0 0 12px">
+        Le serveur se contrôle lui-même toutes les 5 minutes : diffusion figée → relance,
+        disque plein → nettoyage, clip disparu → alerte. Aucun cron, aucun script à installer.
+      </div>
+      <div class="row2" style="margin-bottom:10px">
+        <div><div class="hint">Dernier contrôle</div><div id="watchLast">—</div></div>
+        <div><div class="hint">Disque</div><div id="watchDisk">—</div></div>
+      </div>
+      <div class="hint" id="watchSys"></div>
+      <div id="watchCmdBox" style="display:none;margin-top:9px">
+        <div class="hint">Commande à coller une seule fois dans la console DigitalOcean
+          (pour redémarrer aussi après un plantage du serveur) :</div>
+        <textarea id="watchCmd" readonly rows="3" style="font-family:ui-monospace,monospace;font-size:11px"></textarea>
+        <button class="btn ghost" id="watchCopy" style="margin-top:9px">Copier la commande</button>
+      </div>
+      <div id="watchOps" class="hint" style="margin-top:10px"></div>
+      <button class="btn ghost" id="watchRun" style="margin-top:6px">Lancer un contrôle maintenant</button>
+      <button class="btn ghost" id="diagRun" style="margin-top:9px">Afficher le diagnostic complet</button>
+      <pre id="diagOut" style="display:none;white-space:pre-wrap;font-size:11px;line-height:1.5;background:#f6f7f9;border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0 0;overflow:auto;max-height:340px"></pre>
+      <button class="btn ghost" id="diagCopy" style="display:none;margin-top:9px">Copier le diagnostic</button>
+    </div>
+
     <div class="card">
       <h2>Grosse vidéo déjà sur le serveur</h2>
       <div class="hint" style="margin:0 0 10px">Envoie le fichier par rsync/scp, puis indique son chemin ici :
@@ -469,7 +493,7 @@ document.querySelectorAll('.tabs button').forEach((b) => {
     document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x === b));
     document.querySelectorAll('.page').forEach((p) => p.classList.toggle('active', p.id === 'page-' + b.dataset.page));
     if (b.dataset.page === 'clips') refresh();
-    if (b.dataset.page === 'settings') { loadYt(); loadMail(); }
+    if (b.dataset.page === 'settings') { loadYt(); loadMail(); loadWatch(); }
   });
 });
 
@@ -957,6 +981,96 @@ $('ytTest').addEventListener('click', async () => {
   }, 800);
 })();
 
+/* ---------------- surveillance ---------------- */
+function ilYA(ms) {
+  if (!ms) return '—';
+  const s = Math.round((Date.now() - ms) / 1000);
+  if (s < 90) return 'il y a ' + s + ' s';
+  if (s < 5400) return 'il y a ' + Math.round(s / 60) + ' min';
+  return 'il y a ' + Math.round(s / 3600) + ' h';
+}
+
+async function loadWatch() {
+  try {
+    const d = await api('/api/surveillance');
+    $('watchLast').textContent = ilYA(d.dernierPassage);
+    $('watchDisk').textContent = (d.disque === null || d.disque === undefined) ? '—' : d.disque + ' %';
+    const b = $('watchBadge');
+    if (d.systemdOk === true) {
+      b.textContent = 'complète';
+      b.style.color = 'var(--ok)';
+      $('watchSys').textContent = 'Redémarrage après plantage : installé ✅';
+      $('watchCmdBox').style.display = 'none';
+    } else if (d.systemdOk === false) {
+      b.textContent = 'partielle';
+      b.style.color = 'var(--warn)';
+      $('watchSys').textContent = 'La surveillance fonctionne, mais si le serveur plante complètement '
+        + 'il ne redémarre pas tout seul. Une seule commande à coller pour finir.';
+      $('watchCmd').value = d.commandeSystemd;
+      $('watchCmdBox').style.display = 'block';
+    } else {
+      b.textContent = 'intégrée';
+      b.style.color = 'var(--ok)';
+      $('watchSys').textContent = 'Contrôle actif. (État du redémarrage après plantage : non détecté ici.)';
+      $('watchCmdBox').style.display = 'none';
+    }
+    $('watchOps').textContent = d.mail
+      ? 'Tu seras prévenu par e-mail en cas d\'intervention.'
+      : 'Configure l\'alerte e-mail ci-dessus pour être prévenu.';
+    const ops = (d.reparations || []);
+    if (ops.length) {
+      $('watchOps').textContent += ' Dernières actions : '
+        + ops.slice(-3).map((o) => o.txt).join(' · ');
+    }
+  } catch {}
+}
+
+$('watchRun').addEventListener('click', async () => {
+  $('watchRun').disabled = true;
+  $('watchOps').textContent = 'Contrôle en cours…';
+  try {
+    const d = await api('/api/surveillance/forcer', { body: {} });
+    $('watchOps').textContent = d.bilan && d.bilan.length
+      ? 'Actions effectuées : ' + d.bilan.join(' · ')
+      : 'Tout est normal : aucune réparation nécessaire.';
+    addLocal('ok', 'Contrôle manuel terminé : ' + (d.bilan && d.bilan.length ? d.bilan.join(' · ') : 'rien à réparer'));
+    await loadWatch();
+  } catch (e) { $('watchOps').textContent = 'Erreur : ' + e.message; }
+  finally { $('watchRun').disabled = false; }
+});
+
+$('watchCopy').addEventListener('click', async () => {
+  const t = $('watchCmd');
+  t.focus(); t.select();
+  let ok = false;
+  try { await navigator.clipboard.writeText(t.value); ok = true; } catch {}
+  if (!ok) { try { ok = document.execCommand('copy'); } catch {} }
+  toast(ok ? 'Commande copiée' : 'Sélectionne le texte et copie-le à la main');
+});
+
+$('diagRun').addEventListener('click', async () => {
+  $('diagRun').disabled = true;
+  try {
+    const d = await api('/api/diagnostic');
+    $('diagOut').textContent = d.texte;
+    $('diagOut').style.display = 'block';
+    $('diagCopy').style.display = 'inline-block';
+  } catch (e) { toast('Erreur : ' + e.message); }
+  finally { $('diagRun').disabled = false; }
+});
+
+$('diagCopy').addEventListener('click', async () => {
+  const t = $('diagOut');
+  let ok = false;
+  try { await navigator.clipboard.writeText(t.textContent); ok = true; } catch {}
+  if (!ok) {
+    const r = document.createRange(); r.selectNodeContents(t);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    try { ok = document.execCommand('copy'); } catch {}
+  }
+  toast(ok ? 'Diagnostic copié' : 'Sélectionne le texte et copie-le à la main');
+});
+
 /* ---------------- alerte e-mail ---------------- */
 async function loadMail() {
   try {
@@ -1063,6 +1177,7 @@ $('btnLock').addEventListener('click', async () => {
   refresh();
   loadYt();
   loadMail();
+  loadWatch();
   loadLogs();   // historique complet une seule fois (since = 0 au départ)
 
   setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, 3000);
@@ -1072,5 +1187,5 @@ $('btnLock').addEventListener('click', async () => {
   });
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5696915990e22b7',t:'MTc5NDAyMzgxMQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5696915990e22b7',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5698166bf2af154',t:'MTc5NDAyNDgwNw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5698166bf2af154',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
