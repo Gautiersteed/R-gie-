@@ -329,6 +329,31 @@
       </div>
     </div>
 
+    <div class="card" id="cardMail">
+      <h2>Alerte e-mail <span id="mailBadge" style="text-transform:none;letter-spacing:0;color:var(--warn)">non configurée</span></h2>
+      <div class="hint" style="margin:0 0 12px">
+        Reçois un message <b>uniquement en cas de problème</b> : service arrêté, serveur muet,
+        diffusion figée, disque presque plein. Rien d'autre, jamais de publicité.
+      </div>
+      <div class="field">
+        <label class="f" for="mailUser">Adresse Gmail d'envoi</label>
+        <input type="text" id="mailUser" inputmode="email" autocomplete="off" placeholder="toncompte@gmail.com">
+      </div>
+      <div class="field">
+        <label class="f" for="mailPass">Mot de passe d'application Google (16 caractères)</label>
+        <input type="password" id="mailPass" autocomplete="off" placeholder="abcd efgh ijkl mnop">
+        <div class="hint">Ce n'est <b>pas</b> ton mot de passe Gmail. Google le génère ici :
+          <b>myaccount.google.com/apppasswords</b> (nécessite la validation en 2 étapes).</div>
+      </div>
+      <div class="field">
+        <label class="f" for="mailTo">Recevoir les alertes à</label>
+        <input type="text" id="mailTo" inputmode="email" autocomplete="off" value="steedgautier2@gmail.com">
+      </div>
+      <button class="btn ghost" id="mailSave">Enregistrer</button>
+      <button class="btn ghost" id="mailTest" style="margin-top:9px">Envoyer un e-mail de test</button>
+      <div class="hint" id="mailOut"></div>
+    </div>
+
     <div class="card">
       <h2>Grosse vidéo déjà sur le serveur</h2>
       <div class="hint" style="margin:0 0 10px">Envoie le fichier par rsync/scp, puis indique son chemin ici :
@@ -444,7 +469,7 @@ document.querySelectorAll('.tabs button').forEach((b) => {
     document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x === b));
     document.querySelectorAll('.page').forEach((p) => p.classList.toggle('active', p.id === 'page-' + b.dataset.page));
     if (b.dataset.page === 'clips') refresh();
-    if (b.dataset.page === 'settings') loadYt();
+    if (b.dataset.page === 'settings') { loadYt(); loadMail(); }
   });
 });
 
@@ -932,6 +957,56 @@ $('ytTest').addEventListener('click', async () => {
   }, 800);
 })();
 
+/* ---------------- alerte e-mail ---------------- */
+async function loadMail() {
+  try {
+    const d = await api('/api/mail/status');
+    const b = $('mailBadge');
+    if (d.configured) {
+      b.textContent = 'active → ' + d.to;
+      b.style.color = 'var(--ok)';
+      if ($('mailUser') && !$('mailUser').value) $('mailUser').value = d.from || '';
+      if ($('mailTo') && !$('mailTo').value) $('mailTo').value = d.to || '';
+    } else {
+      b.textContent = 'non configurée';
+      b.style.color = 'var(--warn)';
+    }
+  } catch {}
+}
+
+$('mailSave').addEventListener('click', async () => {
+  const gmailUser = $('mailUser').value.trim();
+  const appPassword = $('mailPass').value.replace(/\s+/g, '');
+  const mailTo = $('mailTo').value.trim();
+  if (!gmailUser) return toast('Indique ton adresse Gmail');
+  if (appPassword.length !== 16) return toast('Le mot de passe d\'application fait 16 caractères');
+  $('mailSave').disabled = true;
+  try {
+    await api('/api/mail/config', { body: { gmailUser, appPassword, mailTo } });
+    $('mailPass').value = '';
+    $('mailOut').textContent = 'Enregistré. Fais un test pour vérifier.';
+    toast('Alerte configurée');
+    addLocal('ok', 'Alerte e-mail configurée vers ' + mailTo);
+    await loadMail();
+  } catch (e) { $('mailOut').textContent = 'Erreur : ' + e.message; }
+  finally { $('mailSave').disabled = false; }
+});
+
+$('mailTest').addEventListener('click', async () => {
+  $('mailTest').disabled = true;
+  $('mailOut').textContent = 'Envoi en cours…';
+  try {
+    await api('/api/mail/test', { body: {} });
+    $('mailOut').textContent = 'E-mail accepté par Google. Vérifie ta boîte (et les spams).';
+    toast('Test envoyé ✅');
+    addLocal('ok', 'E-mail de test envoyé.');
+  } catch (e) {
+    $('mailOut').textContent = 'Échec : ' + e.message
+      + ' — vérifie le mot de passe d\'application (16 caractères, sans espaces).';
+    toast('Échec de l\'envoi');
+  } finally { $('mailTest').disabled = false; }
+});
+
 /* ---------------- fichier déjà sur le serveur ---------------- */
 $('btnAdopt').addEventListener('click', async () => {
   const file = $('adoptPath').value.trim();
@@ -987,6 +1062,7 @@ $('btnLock').addEventListener('click', async () => {
 
   refresh();
   loadYt();
+  loadMail();
   loadLogs();   // historique complet une seule fois (since = 0 au départ)
 
   setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, 3000);
@@ -996,5 +1072,5 @@ $('btnLock').addEventListener('click', async () => {
   });
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5694f8e8bbeacc1',t:'MTc5NDAyMjc2NQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5694f8e8bbeacc1',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5696915990e22b7',t:'MTc5NDAyMzgxMQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5696915990e22b7',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
