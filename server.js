@@ -22,6 +22,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { spawn, spawnSync } = require('child_process');
+const { pipeline } = require('stream');
 
 const PORT = Number(process.env.PORT || 3000);
 const ROOT = __dirname;
@@ -1314,6 +1315,7 @@ async function createLiveBroadcast(title) {
 /* ================================================================== */
 
 const AUTH_FILE = path.join(DATA_DIR, 'auth.json');
+const SESSION_FILE = path.join(DATA_DIR, 'sessions.json');
 const COOKIE = 'enc_session';
 
 const auth = {
@@ -1404,20 +1406,44 @@ function isHttps(req) {
     || String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https';
 }
 
+/** Écrit les sessions sur disque : un redémarrage du service ne déconnecte plus. */
+let sessionSaveTimer = null;
+function saveSessions() {
+  clearTimeout(sessionSaveTimer);
+  sessionSaveTimer = setTimeout(() => {
+    const now = Date.now();
+    const out = {};
+    for (const [sid, s] of auth.sessions) if (s.exp > now) out[sid] = s;
+    writeJsonFile(SESSION_FILE, out);
+  }, 400);
+}
+
+function loadSessions() {
+  const d = readJsonFile(SESSION_FILE) || {};
+  const now = Date.now();
+  let n = 0;
+  for (const [sid, s] of Object.entries(d)) {
+    if (s && s.exp > now) { auth.sessions.set(sid, s); n++; }
+  }
+  if (n) console.log(`✓ Sessions restaurées : ${n} appareil(s) encore connecté(s)`);
+}
+
 /** Session valide ? (cookie + non expirée). Prolonge à chaque usage. */
 function getSession(req) {
   const sid = parseCookies(req)[COOKIE];
   if (!sid) return null;
   const s = auth.sessions.get(sid);
   if (!s) return null;
-  if (s.exp < Date.now()) { auth.sessions.delete(sid); return null; }
+  if (s.exp < Date.now()) { auth.sessions.delete(sid); saveSessions(); return null; }
   s.exp = Date.now() + auth.ttlMs;   // session glissante
+  saveSessions();
   return { sid, ...s };
 }
 
 function openSession(req, res) {
   const sid = crypto.randomBytes(24).toString('hex');
   auth.sessions.set(sid, { exp: Date.now() + auth.ttlMs, ip: clientIp(req) });
+  saveSessions();
   const maxAge = Math.floor(auth.ttlMs / 1000);
   const parts = [
     `${COOKIE}=${sid}`,
@@ -1433,7 +1459,7 @@ function openSession(req, res) {
 
 function closeSession(req, res) {
   const sid = parseCookies(req)[COOKIE];
-  if (sid) auth.sessions.delete(sid);
+  if (sid) { auth.sessions.delete(sid); saveSessions(); }
   const parts = [`${COOKIE}=`, 'Path=/', 'HttpOnly', 'SameSite=Strict', 'Max-Age=0'];
   if (isHttps(req)) parts.push('Secure');
   res.setHeader('Set-Cookie', parts.join('; '));
@@ -1568,6 +1594,55 @@ function readBody(req, limit = 6 * 1024 * 1024 * 1024) {
     req.on('end', () => resolve(Buffer.concat(chunks)));
     req.on('error', reject);
   });
+}
+
+/** Écrit le corps de la requête directement sur le disque, sans passer par la RAM. */
+function streamToFile(req, dest, append = false) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const out = fs.createWriteStream(dest, { flags: append ? 'a' : 'w' });
+    let done = false;
+    const fail = (e) => {
+      if (done) return;
+      done = true;
+      try { out.destroy(); } catch {}
+      reject(e);
+    };
+    req.on('data', (c) => { size += c.length; });
+    req.on('error', fail);
+    req.on('aborted', () => fail(new Error('Envoi interrompu par le client.')));
+    out.on('error', fail);
+    out.on('finish', () => { if (!done) { done = true; resolve(size); } });
+    pipeline(req, out, (err) => { if (err) fail(err); else if (!done) { done = true; resolve(size); } });
+  });
+}
+
+/* ---- Envois en cours (survivent à un redémarrage du service) ---- */
+const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
+const UPLOAD_FILE = path.join(DATA_DIR, 'uploads.json');
+const uploads = new Map();
+
+function uploadPartPath(id) { return path.join(UPLOAD_DIR, id + '.part'); }
+
+function saveUploads() {
+  const now = Date.now();
+  for (const [id, u] of uploads) {
+    if (now - u.createdAt > 7 * 24 * 3600 * 1000) {   // envois abandonnés depuis 7 j
+      uploads.delete(id);
+      try { fs.unlinkSync(uploadPartPath(id)); } catch {}
+    }
+  }
+  writeJsonFile(UPLOAD_FILE, [...uploads.values()]);
+}
+
+function loadUploads() {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+  const arr = readJsonFile(UPLOAD_FILE) || [];
+  for (const u of arr) {
+    if (!u || !u.id) continue;
+    if (fs.existsSync(uploadPartPath(u.id))) uploads.set(u.id, u);
+  }
+  if (uploads.size) console.log(`✓ Envois interrompus mémorisés : ${uploads.size} (reprise possible)`);
 }
 
 function safeJoin(base, rel) {
@@ -1766,9 +1841,10 @@ const server = http.createServer(async (req, res) => {
       const rel = path.join('clips', id + ext);
       const abs = path.join(ROOT, rel);
 
-      const buf = await readBody(req);
-      if (!buf.length) return json(res, 400, { error: 'Fichier vide.' });
-      fs.writeFileSync(abs, buf);
+      // Écriture DIRECTE sur le disque : plus aucun fichier en mémoire.
+      // C'est ce qui faisait planter le serveur au-delà de ~2 Go.
+      const wrote = await streamToFile(req, abs);
+      if (!wrote) { try { fs.unlinkSync(abs); } catch {} return json(res, 400, { error: 'Fichier vide.' }); }
 
       let info;
       try { info = probe(abs); }
@@ -1779,7 +1855,7 @@ const server = http.createServer(async (req, res) => {
       const clip = addClip({
         id, title, kind: 'upload', file: rel,
         start: 0, end: info.duration || null, loop: false,
-        duration: info.duration, hasAudio: info.hasAudio, size: buf.length,
+        duration: info.duration, hasAudio: info.hasAudio, size: wrote,
         videoCodec: info.videoCodec, audioCodec: info.audioCodec,
         width: info.width, height: info.height,
       });
@@ -1805,6 +1881,101 @@ const server = http.createServer(async (req, res) => {
       } catch {}
       logAll('info', `Clip supprimé : « ${clip.title} »`);
       return json(res, 200, { ok: true });
+    }
+
+    /* ---- Upload par morceaux, reprenable après coupure ---- */
+    if (p === '/api/clips/upload/start' && req.method === 'POST') {
+      const body = JSON.parse((await readBody(req, 65536)).toString() || '{}');
+      const title = String(body.title || 'Clip vidéo').slice(0, 120);
+      const ext = String(body.ext || '.mp4').replace(/[^a-z0-9.]/gi, '').slice(0, 10) || '.mp4';
+      const total = Math.max(0, Number(body.size) || 0);
+      // Refus immédiat si le disque n'a pas la place : mieux vaut le dire
+      // avant 3 Go d'envoi que d'échouer à 90 %.
+      try {
+        const st = fs.statfsSync(ROOT);
+        const libre = Number(st.bavail) * Number(st.bsize);
+        if (total > 0 && libre < total * 1.05) {
+          return json(res, 507, {
+            error: `Place insuffisante sur le serveur : ${(libre / 1e9).toFixed(1)} Go libres `
+              + `pour un fichier de ${(total / 1e9).toFixed(2)} Go. Utilise « fichier déjà sur le serveur ».`,
+          });
+        }
+      } catch {}
+
+      const id = crypto.randomBytes(8).toString('hex');
+      fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+      fs.writeFileSync(uploadPartPath(id), Buffer.alloc(0));
+      uploads.set(id, { id, title, ext, total, createdAt: Date.now() });
+      saveUploads();
+      logAll('info', `Envoi de « ${title} » démarré (${(total / 1e9).toFixed(2)} Go).`);
+      return json(res, 200, { uploadId: id, received: 0 });
+    }
+
+    if (p === '/api/clips/upload/status' && req.method === 'GET') {
+      const id = url.searchParams.get('uploadId') || '';
+      const u = uploads.get(id);
+      if (!u) return json(res, 404, { error: 'Envoi inconnu (le serveur a peut-être redémarré).' });
+      let received = 0;
+      try { received = fs.statSync(uploadPartPath(id)).size; } catch { received = 0; }
+      return json(res, 200, { uploadId: id, received, total: u.total, title: u.title });
+    }
+
+    if (p === '/api/clips/upload/chunk' && req.method === 'POST') {
+      const id = url.searchParams.get('uploadId') || '';
+      const offset = Number(url.searchParams.get('offset'));
+      const u = uploads.get(id);
+      if (!u) return json(res, 404, { error: 'Envoi inconnu : relance l\'envoi depuis le début.' });
+      const part = uploadPartPath(id);
+      let cur = 0;
+      try { cur = fs.statSync(part).size; } catch { cur = 0; }
+      if (!Number.isFinite(offset) || offset !== cur) {
+        return json(res, 409, { error: 'Position inattendue', received: cur });
+      }
+      try {
+        await streamToFile(req, part, true);
+      } catch (e) {
+        let after = 0; try { after = fs.statSync(part).size; } catch {}
+        logAll('warn', `Envoi interrompu à ${(after / 1e9).toFixed(2)} Go : ${e.message}`);
+        return json(res, 499, { error: e.message, received: after });
+      }
+      let received = 0; try { received = fs.statSync(part).size; } catch {}
+      return json(res, 200, { received, total: u.total });
+    }
+
+    if (p === '/api/clips/upload/finish' && req.method === 'POST') {
+      const body = JSON.parse((await readBody(req, 65536)).toString() || '{}');
+      const id = String(body.uploadId || '');
+      const u = uploads.get(id);
+      if (!u) return json(res, 404, { error: 'Envoi inconnu.' });
+      const part = uploadPartPath(id);
+      if (!fs.existsSync(part) || fs.statSync(part).size === 0) {
+        return json(res, 400, { error: 'Aucune donnée reçue.' });
+      }
+      const rel = path.join('clips', id + u.ext);
+      const abs = path.join(ROOT, rel);
+      try { fs.renameSync(part, abs); } catch (e) { return json(res, 500, { error: e.message }); }
+      let info;
+      try { info = probe(abs); }
+      catch (e) {
+        try { fs.unlinkSync(abs); } catch {}
+        uploads.delete(id); saveUploads();
+        return json(res, 400, { error: 'Fichier illisible : ' + e.message });
+      }
+      const clip = addClip({
+        id, title: u.title, kind: 'upload', file: rel,
+        start: 0, end: info.duration || null, loop: false,
+        duration: info.duration, hasAudio: info.hasAudio, size: info.size,
+        videoCodec: info.videoCodec, audioCodec: info.audioCodec,
+        width: info.width, height: info.height,
+      });
+      if (clip.id !== id) {
+        const rel2 = path.join('clips', clip.id + u.ext);
+        try { fs.renameSync(abs, path.join(ROOT, rel2)); clip.file = rel2; saveLibrary(); } catch {}
+      }
+      uploads.delete(id); saveUploads();
+      logAll('ok', `Clip ajouté : « ${clip.title} » (${fmtTime(info.duration || 0)}, `
+        + `${(info.size / 1e9).toFixed(2)} Go${info.hasAudio ? ', avec audio' : ', sans audio'})`);
+      return json(res, 200, { clip, probe: info });
     }
 
     // Enregistrer un fichier déjà présent sur le serveur (gros fichiers : rsync/scp)
@@ -2118,8 +2289,16 @@ server.on('upgrade', (req, socket) => {
 ensureFfmpeg();
 ensureYtdlp();
 initAuth();
+loadSessions();
+loadUploads();
 loadLibrary();
 pruneCache();
+
+// Node 18+ interrompt toute requête au bout de 5 minutes (requestTimeout).
+// Un envoi de plusieurs Go en 4G dure bien plus longtemps : on désactive.
+server.requestTimeout = 0;
+server.headersTimeout = 120000;
+server.keepAliveTimeout = 120000;
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🎥 Live Encoder prêt sur http://0.0.0.0:${PORT}`);
