@@ -232,6 +232,9 @@
         <button class="btn ghost" id="btnPick">Choisir une vidéo dans le téléphone</button>
         <input type="file" id="fileInput" accept="video/*" style="display:none">
         <div class="progress" id="upProg"><i id="upBar"></i></div>
+        <div id="resumeBox" style="display:none;margin-top:9px">
+          <button class="btn ghost" id="resumeBtn" style="padding:11px 13px;font-size:13.5px">Reprendre l'envoi</button>
+        </div>
         <div class="hint" id="upHint">Envoi vers le serveur. Pour une vidéo de plus de 2 Go, utilise plutôt
           « fichier déjà sur le serveur » dans Réglages.</div>
       </div>
@@ -635,42 +638,143 @@ $('fileInput').addEventListener('change', (e) => {
   if (f) upload(f);
 });
 
-function upload(file) {
-  const ext = (file.name.match(/\.[a-z0-9]+$/i) || ['.mp4'])[0];
-  const title = file.name.replace(/\.[^.]+$/, '');
-  const xhr = new XMLHttpRequest();
+/* ---- envoi par morceaux, reprenable après coupure réseau ---- */
+const CHUNK = 8 * 1024 * 1024;          // 8 Mo par morceau
+const UP_KEY = 'upload_en_cours';        // pour reprendre après un rechargement
+
+function saveUpState(st) {
+  try { st ? localStorage.setItem(UP_KEY, JSON.stringify(st)) : localStorage.removeItem(UP_KEY); } catch {}
+}
+function readUpState() {
+  try { return JSON.parse(localStorage.getItem(UP_KEY) || 'null'); } catch { return null; }
+}
+
+function setProgress(shown, pct, label) {
   const prog = $('upProg'), bar = $('upBar');
-  prog.classList.add('show');
-  bar.style.width = '0%';
-  $('upHint').textContent = 'Envoi de « ' + title + ' » (' + fmtSize(file.size) + ')…';
-  xhr.open('POST', '/api/clips/upload?title=' + encodeURIComponent(title) + '&ext=' + encodeURIComponent(ext));
-  xhr.upload.onprogress = (ev) => {
-    if (!ev.lengthComputable) return;
-    const p = Math.round((ev.loaded / ev.total) * 100);
-    bar.style.width = p + '%';
-    $('upHint').textContent = 'Envoi ' + p + ' % (' + fmtSize(ev.loaded) + ' / ' + fmtSize(ev.total) + ')';
-  };
-  xhr.onload = () => {
-    prog.classList.remove('show');
-    let d = {};
-    try { d = JSON.parse(xhr.responseText); } catch {}
-    if (xhr.status >= 200 && xhr.status < 300 && d.clip) {
-      $('upHint').textContent = 'Ajouté : « ' + d.clip.title + ' » (' + fmtDur(d.clip.duration) + ')';
-      toast('Vidéo ajoutée');
-      addLocal('ok', 'Clip ajouté : « ' + d.clip.title + ' »');
-      state.selected = d.clip.id;
-      refresh();
-    } else {
-      $('upHint').textContent = 'Échec : ' + (d.error || ('erreur ' + xhr.status));
-      toast(d.error || 'Envoi impossible');
+  if (shown) prog.classList.add('show'); else prog.classList.remove('show');
+  if (pct != null) bar.style.width = Math.max(0, Math.min(100, pct)) + '%';
+  if (label != null) $('upHint').textContent = label;
+}
+
+async function uploadFile(file, resume) {
+  const title = file.name.replace(/\.[^.]+$/, '');
+  const ext = (file.name.match(/\.[a-z0-9]+$/i) || ['.mp4'])[0];
+  let st = resume;
+  let uploadId, offset = 0;
+
+  if (st && st.name === file.name && st.size === file.size) {
+    uploadId = st.uploadId;
+    try {
+      const r = await fetch('/api/clips/upload/status?uploadId=' + encodeURIComponent(uploadId));
+      if (r.ok) {
+        const d = await r.json();
+        offset = d.received || 0;
+        setProgress(true, (offset / file.size) * 100,
+          'Reprise de l\'envoi à ' + Math.round((offset / file.size) * 100) + ' % (' + fmtSize(offset) + ' déjà reçus)…');
+      } else {
+        uploadId = null; offset = 0;
+      }
+    } catch { uploadId = null; offset = 0; }
+  }
+
+  if (!uploadId) {
+    setProgress(true, 0, 'Préparation de l\'envoi de « ' + title + ' » (' + fmtSize(file.size) + ')…');
+    const r = await fetch('/api/clips/upload/start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, ext, size: file.size }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'Démarrage impossible');
+    uploadId = d.uploadId;
+    offset = 0;
+  }
+
+  saveUpState({ uploadId, name: file.name, size: file.size, title });
+
+  let echecs = 0;
+  while (offset < file.size) {
+    const end = Math.min(offset + CHUNK, file.size);
+    const blob = file.slice(offset, end);
+    try {
+      const r = await fetch('/api/clips/upload/chunk?uploadId=' + encodeURIComponent(uploadId) + '&offset=' + offset, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: blob,
+      });
+      if (r.status === 409) {
+        const d = await r.json().catch(() => ({}));
+        offset = d.received || 0;                       // le serveur a déjà plus : on se recale
+        echecs = 0;
+        continue;
+      }
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json().catch(() => ({}));
+      offset = d.received != null ? d.received : end;
+      echecs = 0;
+      const pct = (offset / file.size) * 100;
+      setProgress(true, pct, 'Envoi ' + pct.toFixed(0) + ' %  ·  ' + fmtSize(offset) + ' / ' + fmtSize(file.size));
+    } catch (e) {
+      echecs++;
+      if (echecs > 8) throw new Error('Connexion perdue (' + e.message + ')');
+      const attente = Math.min(30, 2 * echecs);
+      setProgress(true, (offset / file.size) * 100,
+        'Coupure réseau — nouvelle tentative dans ' + attente + ' s (morceau conservé à ' +
+        ((offset / file.size) * 100).toFixed(0) + ' %)');
+      await new Promise((r2) => setTimeout(r2, attente * 1000));
     }
-  };
-  xhr.onerror = () => {
-    prog.classList.remove('show');
-    $('upHint').textContent = 'Échec réseau (fichier trop lourd ?)';
+  }
+
+  setProgress(true, 100, 'Vérification du fichier par le serveur…');
+  const r = await fetch('/api/clips/upload/finish', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uploadId }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || 'Fichier refusé');
+  saveUpState(null);
+  setProgress(false, 100, 'Ajouté : « ' + d.clip.title + ' » (' + fmtDur(d.clip.duration) + ')');
+  toast('Vidéo ajoutée');
+  addLocal('ok', 'Clip ajouté : « ' + d.clip.title + ' » (' + fmtDur(d.clip.duration) + ')');
+  state.selected = d.clip.id;
+  refresh();
+  return d.clip;
+}
+
+async function upload(file) {
+  try {
+    await uploadFile(file, readUpState());
+  } catch (e) {
+    setProgress(true, null, 'Échec : ' + e.message + ' — appuie sur « Reprendre l\'envoi »');
     toast('Envoi interrompu');
-  };
-  xhr.send(file);
+    addLocal('error', 'Envoi de « ' + file.name + ' » : ' + e.message);
+    lastFailedFile = file;
+    majReprise();
+  }
+}
+
+let lastFailedFile = null;
+
+function majReprise() {
+  const st = readUpState();
+  const box = $('resumeBox');
+  if (!box) return;
+  if (st) {
+    box.style.display = 'block';
+    $('resumeTxt').textContent = 'Envoi interrompu : « ' + st.name + ' » ('
+      + Math.round((st.size ? st.size : 1) ? 100 * 0 : 0) + '%)';
+    $('resumeBtn').textContent = 'Reprendre l\'envoi de « ' + st.title + ' »';
+  } else {
+    box.style.display = 'none';
+  }
+}
+
+if ($('resumeBtn')) {
+  $('resumeBtn').addEventListener('click', () => {
+    if (lastFailedFile) return upload(lastFailedFile);
+    // après un rechargement de page, on redemande le fichier : il n'est plus accessible
+    toast('Sélectionne à nouveau le même fichier');
+    $('fileInput').click();
+  });
 }
 
 $('btnLink').addEventListener('click', async () => {
@@ -892,5 +996,5 @@ $('btnLock').addEventListener('click', async () => {
   });
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a567a9a03a856fab',t:'MTc5NDAwNTQ4Mw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a567a9a03a856fab',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
