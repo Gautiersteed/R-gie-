@@ -21,6 +21,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const os = require('os');
 const { spawn, spawnSync } = require('child_process');
 const { pipeline } = require('stream');
 
@@ -751,6 +752,83 @@ function ratioMatches(clip, ratio, opts = {}) {
   }
   return false;
 }
+
+/* ---- Alerte e-mail (Gmail SMTP via curl) ---- */
+const MAIL_FILE = path.join(DATA_DIR, 'mail.conf');
+
+function mailConf() {
+  try {
+    const txt = fs.readFileSync(MAIL_FILE, 'utf8');
+    const out = {};
+    for (const l of txt.split('\n')) {
+      const m = l.match(/^\s*([A-Z_]+)=(.*)$/);
+      if (m) out[m[1]] = m[2].trim();
+    }
+    return out;
+  } catch { return {}; }
+}
+
+function mailReady() {
+  const c = mailConf();
+  return Boolean(c.GMAIL_USER && c.GMAIL_APP_PASSWORD && c.MAIL_TO);
+}
+
+function sendMail(subject, body) {
+  const c = mailConf();
+  if (!c.GMAIL_USER || !c.GMAIL_APP_PASSWORD || !c.MAIL_TO) {
+    return { ok: false, error: 'Alerte e-mail non configurée.' };
+  }
+  const msg = [
+    'From: Encodeur live <' + c.GMAIL_USER + '>',
+    'To: ' + c.MAIL_TO,
+    'Subject: [Encodeur] ' + String(subject).replace(/[\r\n]/g, ' '),
+    'Date: ' + new Date().toUTCString(),
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset=UTF-8',
+    '',
+    String(body || ''),
+    '',
+    '---',
+    'Serveur : ' + os.hostname() + ' · ' + new Date().toLocaleString('fr-FR'),
+    'Direct  : ' + (live.proc ? 'en cours (' + (live.clipId ? (clips.get(live.clipId) || {}).title : '') + ')' : 'à l\'arrêt'),
+    'https://live-gautier.duckdns.org',
+  ].join('\r\n');
+
+  const tmp = path.join(DATA_DIR, 'mail-tmp-' + Date.now() + '.txt');
+  try { fs.writeFileSync(tmp, msg, { mode: 0o600 }); } catch (e) { return { ok: false, error: e.message }; }
+  const r = spawnSync('curl', [
+    '-sS', '--url', 'smtps://smtp.gmail.com:465', '--ssl-reqd',
+    '--user', c.GMAIL_USER + ':' + c.GMAIL_APP_PASSWORD,
+    '--mail-from', c.GMAIL_USER, '--mail-rcpt', c.MAIL_TO,
+    '--upload-file', tmp, '--max-time', '30',
+  ], { encoding: 'utf8' });
+  try { fs.unlinkSync(tmp); } catch {}
+  if (r.status === 0) {
+    logAll('ok', 'Alerte e-mail envoyée à ' + c.MAIL_TO);
+    return { ok: true };
+  }
+  const brut = (r.stderr || r.stdout || '').trim();
+  const connus = {
+    6: 'serveur Gmail introuvable (DNS) — le VPS a-t-il accès au réseau ?',
+    7: 'connexion au port 465 refusée (pare-feu du VPS ?)',
+    35: 'handshake TLS impossible',
+    55: 'envoi interrompu par le serveur',
+    56: 'connexion interrompue',
+    67: 'mot de passe d\'application refusé par Google — vérifie les 16 caractères et la validation en 2 étapes',
+    28: 'délai dépassé en contactant Gmail',
+  };
+  const expl = connus[r.status] || brut || ('curl ' + r.status);
+  const motif = brut && !connus[r.status] ? brut.slice(0, 300) : expl;
+  logAll('error', 'Alerte e-mail refusée : ' + motif);
+  return { ok: false, error: motif };
+}
+
+process.on('uncaughtException', (e) => {
+  logAll('error', 'Erreur interne : ' + e.message);
+  if (mailReady()) {
+    try { sendMail('Encodeur : erreur interne', 'Le serveur a rencontré une erreur inattendue :\n' + e.message + '\n\nLe service continue de tourner.'); } catch {}
+  }
+});
 
 function fmtBytes(b) {
   if (!Number.isFinite(b)) return '∞';
@@ -1859,6 +1937,42 @@ const server = http.createServer(async (req, res) => {
     }
 
     /* ---------- YouTube : configuration OAuth ---------- */
+    if (p === '/api/mail/status') {
+      const c = mailConf();
+      return json(res, 200, {
+        configured: mailReady(),
+        to: c.MAIL_TO || null,
+        from: c.GMAIL_USER || null,
+      });
+    }
+
+    if (p === '/api/mail/config' && req.method === 'POST') {
+      const body = JSON.parse((await readBody(req, 16384)).toString() || '{}');
+      const user = String(body.gmailUser || '').trim();
+      const pass = String(body.appPassword || '').replace(/\s+/g, '');
+      const to = String(body.mailTo || '').trim() || user;
+      if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(user)) return json(res, 400, { error: 'Adresse Gmail invalide.' });
+      if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(to)) return json(res, 400, { error: 'Adresse de destination invalide.' });
+      if (pass.replace(/\s/g, '').length !== 16) {
+        return json(res, 400, { error: 'Le mot de passe d\'application Google fait 16 caractères (sans les espaces).' });
+      }
+      const txt = `GMAIL_USER=${user}\nGMAIL_APP_PASSWORD=${pass}\nMAIL_TO=${to}\n`;
+      try {
+        fs.writeFileSync(MAIL_FILE, txt, { mode: 0o600 });
+        fs.chmodSync(MAIL_FILE, 0o600);
+      } catch (e) { return json(res, 500, { error: 'Écriture impossible : ' + e.message }); }
+      logAll('ok', 'Alerte e-mail configurée pour ' + to);
+      return json(res, 200, { ok: true, to });
+    }
+
+    if (p === '/api/mail/test' && req.method === 'POST') {
+      const r = sendMail('Test d\'alerte réussi',
+        'Si tu reçois ce message, les alertes automatiques de l\'encodeur fonctionnent.\n\n'
+        + 'Tu seras prévenu uniquement en cas de problème : service arrêté, serveur muet, '
+        + 'diffusion figée, disque presque plein.');
+      return json(res, r.ok ? 200 : 502, r);
+    }
+
     if (p === '/api/yt/config' && req.method === 'POST') {
       const body = JSON.parse((await readBody(req, 8192)).toString() || '{}');
       const clientId = String(body.clientId || '').trim();
