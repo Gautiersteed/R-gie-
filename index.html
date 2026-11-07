@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>Diffusion continue — Ouvrir l'encodeur</title>
+<meta name="description" content="Porte d'entrée vers l'encodeur de diffusion continue.">
+<style>
+  :root{--accent:#ff2d55;--txt:#0f172a;--muted:#64748b;--line:#e2e8f0}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:0;background:#fff;color:var(--txt);
+    font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    padding:24px 20px calc(24px + env(safe-area-inset-bottom));
+    text-align:center;
+  }
+  .card{width:100%;max-width:420px}
+  .logo{
+    width:76px;height:76px;margin:0 auto 22px;border-radius:22px;
+    background:var(--accent);display:flex;align-items:center;justify-content:center;
+    box-shadow:0 10px 30px rgba(255,45,85,.28);
+  }
+  h1{font-size:24px;line-height:1.25;margin:0 0 10px;letter-spacing:-.4px;font-weight:800}
+  p.sub{margin:0 0 28px;color:var(--muted);font-size:15.5px}
+  .btn{
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    width:100%;min-height:62px;padding:16px 20px;border:0;border-radius:16px;
+    background:var(--accent);color:#fff;font-size:18px;font-weight:700;
+    text-decoration:none;box-shadow:0 8px 22px rgba(255,45,85,.30);
+    transition:transform .12s ease,box-shadow .12s ease;
+  }
+  .btn:active{transform:scale(.975);box-shadow:0 4px 14px rgba(255,45,85,.28)}
+  .url{
+    display:block;margin:14px 0 0;font-size:13px;color:var(--muted);
+    word-break:break-all;text-decoration:none;
+  }
+  .url b{color:#334155;font-weight:600}
+  .note{
+    margin:30px auto 0;padding:14px 16px;border:1px solid var(--line);border-radius:14px;
+    background:#f8fafc;font-size:13.5px;color:#475569;text-align:left;
+  }
+  .note strong{color:#0f172a}
+  details{margin-top:22px;text-align:left;font-size:13.5px;color:var(--muted)}
+  summary{cursor:pointer;color:#334155;font-weight:600;font-size:14px;padding:4px 0}
+  details ul{margin:10px 0 0;padding-left:20px}
+  details li{margin:7px 0}
+  footer{margin-top:34px;font-size:12px;color:#94a3b8}
+</style>
+</head>
+<body>
+  <main class="card">
+    <div class="logo" aria-hidden="true">
+      <svg width="38" height="38" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="2.6" fill="#fff"/>
+        <path d="M7.5 7.5a6.4 6.4 0 0 0 0 9M16.5 16.5a6.4 6.4 0 0 0 0-9" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+        <path d="M4.6 4.6a10.5 10.5 0 0 0 0 14.8M19.4 19.4a10.5 10.5 0 0 0 0-14.8" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".55"/>
+      </svg>
+    </div>
+
+    <h1>Diffusion continue</h1>
+    <p class="sub">Ta régie de direct YouTube.<br>Clique pour ouvrir l'encodeur.</p>
+
+    <a class="btn" href="https://live-gautier.duckdns.org">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M8 5.5v13l11-6.5-11-6.5Z" fill="#fff"/>
+      </svg>
+      Ouvrir mon encodeur
+    </a>
+
+    <a class="url" href="https://live-gautier.duckdns.org">
+      <b>live-gautier.duckdns.org</b>
+    </a>
+
+    <div class="note">
+      <strong>Cette page n'est qu'une porte.</strong> L'application elle-même tourne
+      sur ton serveur, pas ici. Elle a besoin d'être servie par son propre serveur
+      pour garder ta connexion et accéder à tes clips : c'est normal, et c'est même
+      ce qui la rend solide.
+    </div>
+
+    <details>
+      <summary>Pourquoi cette page est vide exprès</summary>
+      <ul>
+        <li>Elle ne contient <strong>aucune copie</strong> de l'application : impossible
+          qu'elle affiche une vieille version par erreur.</li>
+        <li>Elle s'ouvre même si le serveur est éteint, et te dit où aller.</li>
+        <li>Astuce téléphone : menu <em>Partager</em> → <em>Sur l'écran d'accueil</em>
+          pour l'avoir comme une application.</li>
+      </ul>
+    </details>
+  </main>
+
+  <footer>Gautiersteed · encodeur de diffusion continue</footer>
+</body>
+</html>
